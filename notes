@@ -1,0 +1,18 @@
+Each engine (at launch time) gets its failure time calculated according to the appropriate bathtub-curved Poisson process, for each of the possible failure modes.  Then, during burn cycle, we just have to tick forward and see if we've passed any new failure events and if so apply them.
+Each engine also records the du for that engine-type at launch time and adds to it while it burns; then the engine-type du is max(engine du for engine in engine-type).
+
+Bathtub curves: defined piecewise.  f*(t) := f(t) / P(T ≥ t) is instantaneous failure probability (1 / MTBF), because the failure has to happen _somewhere_ in the range: P(T < 2B + 5) = 1.
+Infant mortality: 0 ≤ t < 5, f(t) = λe^(-λt), P(T < t) = 1 - e^(-λt).
+  Thus P(T < 5) = 1 - e^(-5λ),
+    so e^(-5λ) = 1 - P(T < 5),
+    so -5λ = ln(1 - P(T < 5)),
+    so λ = -⅕ln(1 - P(T < 5))
+  f*(t) = λe^(-λt) / e^(-λt) = λ
+Flat region: 5 ≤ t < B + 5, f(t) = κe^(-κ(t - 5)), P(T < t | T ≥ 5) = 1 - e^(-κ(t - 5)).
+  κ = -ln(1 - P(T < B + 5 | T ≥ 5)) / B
+  f*(t) = κ
+Old age: B + 5 ≤ t < 2B + 5, f(t) = 1 / B, P (T < t | T ≥ B + 5) = (t - B - 5) / B
+  Thus P(T < 2B + 5 | T ≥ B + 5) = B / B = 1 (ok)
+  f*(t) = 1 / (2B + 5 - t)
+  so f*(B + 5) = 1 / B
+  and f*(2B + 5) is infinite
