@@ -60,6 +60,8 @@ namespace TestLite
 		public string configuration;
 		public string oldConfiguration;
 
+		private bool preLaunchFailures = true, determinismMode = false;
+
 		[KSPField()]
 		public double maxData;
 		[KSPField()]
@@ -153,6 +155,12 @@ namespace TestLite
 				return;
 			if (engine != null)
 				Logging.LogFormat("Rolling at {0} => {1:R}", roll_du, failureRate);
+			if (determinismMode) {
+				for (int i = 0; i < (int)failureTypes.IGNITION; i++)
+					failureTime[i] = Double.MaxValue;
+				failureTime[(int)failureTypes.PERMANENT] = ratedBurnTime + 5d;
+				return;
+			}
 			for (int i = 0; i < (int)failureTypes.IGNITION; i++) {
 				if (bathtubType[i])
 					failureTime[i] = rollBathtub(infantPFactor[i] * failureRate,
@@ -268,10 +276,10 @@ namespace TestLite
 				for (int i = 0; i < (int)failureTypes.IGNITION; i++)
 					if (oldRunTime < failureTime[i] && failureTime[i] <= runTime)
 						triggerFailure(i);
-				if (!running) {
+				if (!running && !determinismMode) {
 					double r = Core.Instance.rand.NextDouble();
 					Logging.LogFormat("Igniting, r={0} ignitionRate={1}", r, ignitionRate);
-					if (r < ignitionRate)
+					if (r < ignitionRate && (preLaunchFailures || vessel.situation != Vessel.Situations.PRELAUNCH))
 						triggerFailure((int)failureTypes.IGNITION);
 				}
 				running = true;
@@ -331,10 +339,14 @@ namespace TestLite
 				}
 			}
 			roll_du = total_du;
+			TestLiteGameSettings settings = HighLogic.CurrentGame.Parameters.CustomParams<TestLiteGameSettings>();
+			preLaunchFailures = settings.preLaunchFailures;
+			determinismMode = settings.determinismMode;
 			updateFailureRate();
 			if (HighLogic.LoadedSceneIsFlight)
 				Roll();
 			updateMTBF();
+			updateFieldsGui(false, engine != null);
 		}
 
 		private void updateFieldsGui(bool had, bool have)
@@ -342,14 +354,14 @@ namespace TestLite
 			if (had == have)
 				return;
 			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
-			Fields["in_du"].guiActive = Fields["in_du"].guiActiveEditor = have;
-			Fields["roll_du"].guiActive = Fields["roll_du"].guiActiveEditor = have;
-			Fields["out_du"].guiActive = have;
+			Fields["in_du"].guiActive = Fields["in_du"].guiActiveEditor = have && !determinismMode;
+			Fields["roll_du"].guiActive = Fields["roll_du"].guiActiveEditor = have && !determinismMode;
+			Fields["out_du"].guiActive = have && !determinismMode;
 			Fields["runTime"].guiActive = have;
-			Fields["failureRate"].guiActive = have;
-			Fields["ignitionRate"].guiActive = Fields["ignitionRate"].guiActiveEditor = have;
-			Fields["fstar"].guiActive = have;
-			Fields["MTBF"].guiActive = Fields["MTBF"].guiActiveEditor = have;
+			Fields["failureRate"].guiActive = have && !determinismMode;
+			Fields["ignitionRate"].guiActive = Fields["ignitionRate"].guiActiveEditor = have && !determinismMode;
+			Fields["fstar"].guiActive = have && !determinismMode;
+			Fields["MTBF"].guiActive = Fields["MTBF"].guiActiveEditor = have && !determinismMode;
 		}
 
 		public override void OnAwake()

@@ -137,4 +137,40 @@ namespace TestLite
 				Core.Instance.Load(node);
 		}
 	}
+
+	public class TestLiteGameSettings : GameParameters.CustomParameterNode {
+		public override string Title { get { return "TestLite Options"; } }
+		public override GameParameters.GameMode GameMode { get { return GameParameters.GameMode.ANY; } }
+		public override string Section { get { return "TestLite"; } }
+		public override string DisplaySection { get { return Section; } }
+		public override int SectionOrder { get { return 1; } }
+		public override bool HasPresets { get { return true; } }
+
+		[GameParameters.CustomParameterUI("Deterministic mode", toolTip = "No ignition failures, engines always run for rated burn time then die.  du is irrelevant.")]
+		public bool determinismMode = false;
+		[GameParameters.CustomParameterUI("Pre-Launch Ignition Failures Enabled?", toolTip = "Set to enable ignition failures on the Launch Pad.")]
+		public bool preLaunchFailures = true;
+
+		public override void SetDifficultyPreset(GameParameters.Preset preset)
+		{
+			Logging.Log("Setting difficulty preset");
+			switch (preset) {
+			case GameParameters.Preset.Easy:
+				determinismMode = true;
+				preLaunchFailures = false;
+				break;
+			case GameParameters.Preset.Normal:
+				determinismMode = false;
+				preLaunchFailures = false;
+				break;
+			case GameParameters.Preset.Moderate:
+			case GameParameters.Preset.Hard:
+			case GameParameters.Preset.Custom:
+			default:
+				determinismMode = false;
+				preLaunchFailures = true;
+				break;
+			}
+		}
+	}
 }
