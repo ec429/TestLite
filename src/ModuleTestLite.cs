@@ -14,7 +14,11 @@ namespace TestLite
 		public double failure_du = 0;
 		[KSPField(isPersistant = false)]
 		public double out_du = 0;
+		[KSPField(isPersistant = false)]
+		public double roll_du = 0;
 
+		[KSPField()]
+		public double clampTime = 0;
 		[KSPField()]
 		public double runTime = 0;
 
@@ -26,9 +30,22 @@ namespace TestLite
 		[KSPField()]
 		public string MTBF; /* 1/MTBF */
 
-		/* For now we have just the one failure, later this will need more stuff */
-		[KSPField()]
-		public double failureTime = -1;
+		public enum failureTypes {
+			TRANSIENT,
+			PERMANENT,
+			PERFLOSS,
+			THRUSTLOSS,
+			MAX
+		};
+		public static readonly double[] infantPFactor = {0.05, 0.03, 0.04, 0.03};
+		public static readonly double[] flatPFactor = {0.25, 0.15, 0.25, 0.2};
+		public static readonly bool[] bathtubType = {false, true, false, false};
+		public static readonly double[] failureData = {200d, 1000d, 500d, 500d};
+		public static readonly int[] severityType = {0, 2, 1, 1};
+		public static readonly string[] failureDescription = {"Transient shutdown", "Permanent shutdown", "Performance loss", "Thrust loss"};
+		public double[] failureTime = {-1, -1, -1, -1};
+
+		public bool minor_failure = false, major_failure = false;
 
 		[KSPField()]
 		public double ratedBurnTime;
@@ -39,13 +56,13 @@ namespace TestLite
 		public string configuration;
 		public string oldConfiguration;
 
-		public bool initialised = false;
-
 		[KSPField]
 		public double maxData;
 		[KSPField]
 		public FloatCurve reliabilityCurve;
-		private Dictionary<string, double> techTransfer;
+		[KSPField()]
+		public string techTransfer;
+		private Dictionary<string, double> techTransferData;
 		[KSPField]
 		public float techTransferMax = 1000;
 		[KSPField()]
@@ -53,21 +70,21 @@ namespace TestLite
 
 		public double local_du {
 			get {
-				out_du = Math.Min(in_du + runTime * dataRate + failure_du, maxData);
+				out_du = Math.Min(in_du + (runTime - clampTime) * dataRate + failure_du, maxData);
 				return out_du;
 			}
 		}
 		public double total_du {
 			get {
 				double transferred = 0d;
-				var enumerator = techTransfer.GetEnumerator();
+				var enumerator = techTransferData.GetEnumerator();
 				while (enumerator.MoveNext()) {
 					KeyValuePair<string, double> kvp = enumerator.Current;
 					if (Core.Instance.du.ContainsKey(kvp.Key))
 						transferred += Core.Instance.du[kvp.Key] * kvp.Value;
 				}
 				transferred = Math.Min(transferred, techTransferMax);
-				return Math.Min(local_du + transferred, maxData);
+				return Math.Min(in_du + transferred, maxData);
 			}
 		}
 
@@ -77,6 +94,11 @@ namespace TestLite
 		public override string GetInfo()
 		{
 			return "TODO put something here.";
+		}
+
+		private void updateFailureRate()
+		{
+			failureRate = reliabilityCurve.Evaluate((float)roll_du) * ratedBurnTime;
 		}
 
 		private double rollBathtub(double infantP, double flatP)
@@ -89,6 +111,7 @@ namespace TestLite
 				return -Math.Log(1d - zoner) / lambda;
 			}
 			zoner -= infantP;
+			zoner /= (1d - infantP);
 			if (zoner < flatP) {
 				// T = 5 - ln(U)/κ
 				// κ = -ln(1 - flatP) / B
@@ -96,27 +119,51 @@ namespace TestLite
 				return 5 - Math.Log(1d - zoner) / kappa;
 			}
 			zoner -= flatP;
-			double restP = 1d - infantP - flatP;
-			return 5 + ratedBurnTime * (1d + zoner / restP);
+			zoner /= (1d - flatP);
+			return 5 + ratedBurnTime * (1d + zoner);
 		}
 
-		private void updateFailureRate()
+		private double rollPorch(double infantP, double flatP)
 		{
-			failureRate = reliabilityCurve.Evaluate((float)total_du) * ratedBurnTime;
+			double zoner = Core.Instance.rand.NextDouble();
+			if (zoner < infantP) {
+				// T = -ln(U)/λ
+				// where λ = -⅕ln(1 - infantP)
+				double lambda = -Math.Log(1d - infantP) / 5d;
+				return -Math.Log(1d - zoner) / lambda;
+			}
+			zoner -= infantP;
+			zoner /= (1d - infantP);
+			// T = 5 - ln(U)/κ
+			// κ = -ln(1 - flatP) / B
+			double kappa = -Math.Log(1d - flatP) / ratedBurnTime;
+			return 5 - Math.Log(1d - zoner) / kappa;
 		}
 
 		public void Roll()
 		{
-			if (failureTime >= 0d)
+			if (failureTime[0] >= 0d)
 				return;
-			Logging.LogFormat("Rolling at {0} => {1:R}", total_du, failureRate);
-			failureTime = rollBathtub(0.03 * failureRate, 0.15 * failureRate);
+			if (engine != null)
+				Logging.LogFormat("Rolling at {0} => {1:R}", roll_du, failureRate);
+			for (int i = 0; i < (int)failureTypes.MAX; i++) {
+				if (bathtubType[i])
+					failureTime[i] = rollBathtub(infantPFactor[i] * failureRate,
+								     flatPFactor[i] * failureRate);
+				else
+					failureTime[i] = rollPorch(infantPFactor[i] * failureRate,
+								   flatPFactor[i] * failureRate);
+				if (engine != null)
+					Logging.LogFormat("Rolled {0} at {1}", ((failureTypes)i).ToString(), failureTime[i]);
+			}
 		}
 
 		private void setColour()
 		{
-			if (failureTime <= runTime)
+			if (major_failure)
 				part.stackIcon.SetIconColor(XKCDColors.Red);
+			else if (minor_failure)
+				part.stackIcon.SetIconColor(XKCDColors.KSPNotSoGoodOrange);
 			else
 				part.stackIcon.SetIconColor(XKCDColors.White);
 		}
@@ -130,12 +177,12 @@ namespace TestLite
 			return 1d / Math.Max(2d * ratedBurnTime + 5d - runTime, 1d);
 		}
 
-		public override void OnUpdate()
+		public void Update()
 		{
-			getEngine();
+			bool hadEngine = getEngine();
+			updateFieldsGui(hadEngine, engine != null);
 			if (HighLogic.LoadedSceneIsFlight)
 				Initialise(); /* will do nothing if we're already flying */
-			base.OnUpdate();
 		}
 
 		private void updateCore()
@@ -149,7 +196,11 @@ namespace TestLite
 
 		private void updateMTBF()
 		{
-			fstar = fStar(0.15 * failureRate, 0.85 * failureRate, true);
+			fstar = 0d;
+			for (int i = 0; i < (int)failureTypes.MAX; i++)
+				fstar += fStar(infantPFactor[i] * failureRate,
+					       flatPFactor[i] * failureRate,
+					       bathtubType[i]);
 			double mtbf = 1d / Math.Max(fstar, 1e-12);
 			if (mtbf < 1200)
 				MTBF = String.Format("{0:0.#}s", mtbf);
@@ -157,33 +208,65 @@ namespace TestLite
 				MTBF = String.Format("{0:0.##}m", mtbf / 60.0);
 		}
 
-		public override void OnFixedUpdate()
+		private void triggerFailure(int type)
+		{
+			failure_du += failureData[type];
+			failureTypes ft = (failureTypes)type;
+			updateCore(); /* Make sure we save our failureData, just in case we explode the part */
+			Logging.LogFormat("Failing engine {0}: {1}", configuration, ft.ToString());
+			ScreenMessages.PostScreenMessage(String.Format("[TestLite] {0} on {1}", failureDescription[type], configuration), 5f);
+			switch (severityType[type]) {
+			case 0:
+				break;
+			case 1:
+				minor_failure = true;
+				break;
+			case 2:
+				major_failure = true;
+				break;
+			}
+			switch (ft) {
+			case failureTypes.TRANSIENT:
+				engine.Shutdown();
+				break;
+			case failureTypes.PERMANENT:
+				engine.Shutdown();
+				/* It's permanently dead.  It might even explode. */
+				engine.ignitions = 0;
+				if (Core.Instance.rand.Next(3) == 0)
+					part.explode();
+				break;
+			case failureTypes.PERFLOSS:
+				engine.ispMult *= 0.4d + Core.Instance.rand.NextDouble() * 0.2d;
+				break;
+			case failureTypes.THRUSTLOSS:
+				engine.flowMult *= 0.4d + Core.Instance.rand.NextDouble() * 0.2d;
+				break;
+			}
+			setColour();
+		}
+
+		public void FixedUpdate()
 		{
 			updateMTBF();
 			if (engine != null && engine.finalThrust > 0f) {
 				double oldRunTime = runTime;
 				runTime += TimeWarp.fixedDeltaTime;
-				if (oldRunTime < failureTime && failureTime <= runTime) {
-					Logging.LogFormat("Failing engine {0}: Permanent Shutdown", configuration);
-					engine.Shutdown();
-					failure_du += 1000d;
-					/* It's permanently dead.  It might even explode. */
-					engine.ignitions = 0;
-					if (Core.Instance.rand.Next(3) == 0)
-						part.explode();
-					setColour();
-				}
+				if (vessel.situation == Vessel.Situations.PRELAUNCH)
+					clampTime = runTime;
+				for (int i = 0; i < (int)failureTypes.MAX; i++)
+					if (oldRunTime < failureTime[i] && failureTime[i] <= runTime)
+						triggerFailure(i);
+				updateCore();
 			}
-			updateCore();
-			base.OnFixedUpdate();
 		}
 
-		public void getEngine()
+		public bool getEngine()
 		{
-			if (oldConfiguration != null && oldConfiguration.Equals(configuration))
-				return;
-			oldConfiguration = configuration;
-			Logging.LogFormat("Looking for {0} ({1} core)", configuration, Core.Instance == null ? "no" : "have");
+			bool hadEngine = (engine != null);
+			if (mec != null && mec.configuration.Equals(configuration))
+				/* No change, nothing to do */
+				return hadEngine;
 			engine = null;
 			mec = null;
 			List<RealFuels.ModuleEngineConfigs> mecs = part.FindModulesImplementing<RealFuels.ModuleEngineConfigs>();
@@ -195,7 +278,7 @@ namespace TestLite
 				}
 			}
 			if (mec == null)
-				return;
+				return hadEngine;
 			Logging.LogFormat("Found MEC using configuration {0} (engineID {1})", configuration, mec.engineID);
 			List<RealFuels.ModuleEnginesRF> merfs = part.FindModulesImplementing<RealFuels.ModuleEnginesRF>();
 			l = merfs.Count;
@@ -207,6 +290,7 @@ namespace TestLite
 			}
 			if (engine != null)
 				Logging.Log("Found MERF too");
+			return hadEngine;
 		}
 
 		public void Initialise()
@@ -226,28 +310,31 @@ namespace TestLite
 					Logging.LogFormat("Looked up {0}, found {1}", configuration, in_du);
 				}
 			}
-			if (initialised)
-				return;
+			roll_du = total_du;
 			updateFailureRate();
 			if (HighLogic.LoadedSceneIsFlight)
 				Roll();
-			Logging.LogFormat("Initialise {0} (in_du = {1})", engine != null, in_du);
 			updateMTBF();
-			if (engine) {
-				Fields["in_du"].guiActive = Fields["in_du"].guiActiveEditor = true;
-				Fields["out_du"].guiActive = true;
-				Fields["runTime"].guiActive = true;
-				Fields["failureRate"].guiActive = true;
-				Fields["fstar"].guiActive = true;
-				Fields["MTBF"].guiActive = Fields["MTBF"].guiActiveEditor = true;
-				Fields["failureTime"].guiActive = true;
-			}
-			initialised = true;
+		}
+
+		private void updateFieldsGui(bool had, bool have)
+		{
+			if (had == have)
+				return;
+			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
+			Fields["in_du"].guiActive = Fields["in_du"].guiActiveEditor = have;
+			Fields["roll_du"].guiActive = Fields["roll_du"].guiActiveEditor = have;
+			Fields["out_du"].guiActive = have;
+			Fields["runTime"].guiActive = have;
+			Fields["failureRate"].guiActive = have;
+			Fields["fstar"].guiActive = have;
+			Fields["MTBF"].guiActive = Fields["MTBF"].guiActiveEditor = have;
 		}
 
 		public override void OnAwake()
 		{
-			getEngine();
+			bool hadEngine = getEngine();
+			updateFieldsGui(hadEngine, engine != null);
 		}
 
 		public void LoadTechTransfer(string text)
@@ -271,12 +358,12 @@ namespace TestLite
 									 parts[i], configuration);
 						break;
 					}
-					if (techTransfer.ContainsKey(parts[i])) {
+					if (techTransferData.ContainsKey(parts[i])) {
 						Logging.LogWarningFormat("Skipping duplicate techTransfer from {0} to {1}",
 									 parts[i], configuration);
 						continue;
 					}
-					techTransfer[parts[i]] = transfer;
+					techTransferData.Add(parts[i], transfer);
 				}
 			}
 		}
@@ -284,15 +371,13 @@ namespace TestLite
 		public override void OnLoad(ConfigNode node)
 		{
 			base.OnLoad(node);
-			techTransfer = new Dictionary<string, double>();
-			if (node.HasValue("techTransfer")) {
-				string techTransferText = node.GetValue("techTransfer");
-				LoadTechTransfer(techTransferText);
-			}
+			techTransferData = new Dictionary<string, double>();
+			LoadTechTransfer(techTransfer);
 			if (node.HasNode("reliabilityCurve")) {
 				reliabilityCurve = new FloatCurve();
 				reliabilityCurve.Load(node.GetNode("reliabilityCurve"));
 			}
+			this.OnAwake();
 			Initialise();
 		}
 	}

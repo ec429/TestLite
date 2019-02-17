@@ -27,6 +27,6 @@ Failure modes (with P(T < 5) and P(T < B + 5 | T ≥ 5) given in terms of p = 1 
 Transient shutdown: Porch 0.05p, 0.25p  Engine stops but doesn't wipe out remaining ignitions.
 Permanent shutdown: Bathtub 0.03p, 0.15p.  Engine stops and is now dead (⅓ chance of explosion).
 Performance loss: Porch 0.04p, 0.25p.  Isp reduced by factor ~ U[0.4, 0.6].
-Thrust loss: Porch 0.03p, 0.2p.  Thrust reduced by factor of 0.5.
+Thrust loss: Porch 0.03p, 0.2p.  Thrust reduced by factor ~ U[0.4, 0.6].
 TOTALS: 0.15p + 0.85p = p
 Ignition failure: event, driven by ignitionReliability.  Doesn't wipe out remaining ignitions.
