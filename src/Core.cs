@@ -12,6 +12,8 @@ namespace TestLite
 	{
 		public static Core Instance { get; protected set; }
 		private ApplicationLauncherButton button = null;
+		public System.Random rand;
+		public Dictionary<string, double> du;
 		/* TODO add a GUI when we have stuff to put in it
 		private UI.MasterWindow masterWindow;
 		private UI.ConfigWindow configWindow;
@@ -25,6 +27,8 @@ namespace TestLite
 			}
 
 			Instance = this;
+			du = new Dictionary<string, double>();
+			rand = new System.Random();
 			if (ScenarioTestLite.Instance != null)
 				Load(ScenarioTestLite.Instance.node);
 			Logging.Log("Core loaded successfully");
@@ -94,10 +98,18 @@ namespace TestLite
 
 		public void Save(ConfigNode node)
 		{
+			ConfigNode dn = node.AddNode("du");
+			foreach (KeyValuePair<string, double> kvp in du)
+				dn.AddValue(kvp.Key, kvp.Value.ToString());
 		}
 
 		public void Load(ConfigNode node)
 		{
+			ConfigNode dn = node.GetNode("du");
+			if (dn == null)
+				return;
+			foreach (ConfigNode.Value v in dn.values)
+				du[v.name] = Double.Parse(v.value);
 		}
 	}
 
