@@ -24,28 +24,32 @@ namespace TestLite
 
 		[KSPField()]
 		public double failureRate = 0;
+		[KSPField()]
+		public double ignitionRate = 0; // P(ignition failure)
 
 		[KSPField()]
 		public double fstar = 0; /* 1/MTBF */
 		[KSPField()]
 		public string MTBF; /* 1/MTBF */
+		[KSPField()]
+		public bool running = false;
 
 		public enum failureTypes {
 			TRANSIENT,
 			PERMANENT,
 			PERFLOSS,
 			THRUSTLOSS,
-			MAX
+			IGNITION
 		};
 		public static readonly double[] infantPFactor = {0.05, 0.03, 0.04, 0.03};
 		public static readonly double[] flatPFactor = {0.25, 0.15, 0.25, 0.2};
 		public static readonly bool[] bathtubType = {false, true, false, false};
-		public static readonly double[] failureData = {200d, 1000d, 500d, 500d};
-		public static readonly int[] severityType = {0, 2, 1, 1};
-		public static readonly string[] failureDescription = {"Transient shutdown", "Permanent shutdown", "Performance loss", "Thrust loss"};
+		public static readonly double[] failureData = {200d, 1000d, 500d, 500d, 500d};
+		public static readonly int[] severityType = {0, 2, 1, 1, 0};
+		public static readonly string[] failureDescription = {"Transient shutdown", "Permanent shutdown", "Performance loss", "Thrust loss", "Ignition failure"};
 		public double[] failureTime = {-1, -1, -1, -1};
 
-		public bool minor_failure = false, major_failure = false;
+		public bool transient_failure = false, minor_failure = false, major_failure = false;
 
 		[KSPField()]
 		public double ratedBurnTime;
@@ -56,14 +60,16 @@ namespace TestLite
 		public string configuration;
 		public string oldConfiguration;
 
-		[KSPField]
+		[KSPField()]
 		public double maxData;
-		[KSPField]
+		[KSPField()]
 		public FloatCurve reliabilityCurve;
+		[KSPField()]
+		public FloatCurve ignitionCurve;
 		[KSPField()]
 		public string techTransfer;
 		private Dictionary<string, double> techTransferData;
-		[KSPField]
+		[KSPField()]
 		public float techTransferMax = 1000;
 		[KSPField()]
 		public double techTransferGenerationPenalty = 0.05;
@@ -99,6 +105,7 @@ namespace TestLite
 		private void updateFailureRate()
 		{
 			failureRate = reliabilityCurve.Evaluate((float)roll_du) * ratedBurnTime;
+			ignitionRate = 1d - ignitionCurve.Evaluate((float)roll_du);
 		}
 
 		private double rollBathtub(double infantP, double flatP)
@@ -146,7 +153,7 @@ namespace TestLite
 				return;
 			if (engine != null)
 				Logging.LogFormat("Rolling at {0} => {1:R}", roll_du, failureRate);
-			for (int i = 0; i < (int)failureTypes.MAX; i++) {
+			for (int i = 0; i < (int)failureTypes.IGNITION; i++) {
 				if (bathtubType[i])
 					failureTime[i] = rollBathtub(infantPFactor[i] * failureRate,
 								     flatPFactor[i] * failureRate);
@@ -164,6 +171,8 @@ namespace TestLite
 				part.stackIcon.SetIconColor(XKCDColors.Red);
 			else if (minor_failure)
 				part.stackIcon.SetIconColor(XKCDColors.KSPNotSoGoodOrange);
+			else if (transient_failure)
+				part.stackIcon.SetIconColor(XKCDColors.Yellow);
 			else
 				part.stackIcon.SetIconColor(XKCDColors.White);
 		}
@@ -197,7 +206,7 @@ namespace TestLite
 		private void updateMTBF()
 		{
 			fstar = 0d;
-			for (int i = 0; i < (int)failureTypes.MAX; i++)
+			for (int i = 0; i < (int)failureTypes.IGNITION; i++)
 				fstar += fStar(infantPFactor[i] * failureRate,
 					       flatPFactor[i] * failureRate,
 					       bathtubType[i]);
@@ -217,6 +226,7 @@ namespace TestLite
 			ScreenMessages.PostScreenMessage(String.Format("[TestLite] {0} on {1}", failureDescription[type], configuration), 5f);
 			switch (severityType[type]) {
 			case 0:
+				transient_failure = true;
 				break;
 			case 1:
 				minor_failure = true;
@@ -227,6 +237,7 @@ namespace TestLite
 			}
 			switch (ft) {
 			case failureTypes.TRANSIENT:
+			case failureTypes.IGNITION:
 				engine.Shutdown();
 				break;
 			case failureTypes.PERMANENT:
@@ -254,10 +265,19 @@ namespace TestLite
 				runTime += TimeWarp.fixedDeltaTime;
 				if (vessel.situation == Vessel.Situations.PRELAUNCH)
 					clampTime = runTime;
-				for (int i = 0; i < (int)failureTypes.MAX; i++)
+				for (int i = 0; i < (int)failureTypes.IGNITION; i++)
 					if (oldRunTime < failureTime[i] && failureTime[i] <= runTime)
 						triggerFailure(i);
+				if (!running) {
+					double r = Core.Instance.rand.NextDouble();
+					Logging.LogFormat("Igniting, r={0} ignitionRate={1}", r, ignitionRate);
+					if (r < ignitionRate)
+						triggerFailure((int)failureTypes.IGNITION);
+				}
+				running = true;
 				updateCore();
+			} else {
+				running = false;
 			}
 		}
 
@@ -327,6 +347,7 @@ namespace TestLite
 			Fields["out_du"].guiActive = have;
 			Fields["runTime"].guiActive = have;
 			Fields["failureRate"].guiActive = have;
+			Fields["ignitionRate"].guiActive = Fields["ignitionRate"].guiActiveEditor = have;
 			Fields["fstar"].guiActive = have;
 			Fields["MTBF"].guiActive = Fields["MTBF"].guiActiveEditor = have;
 		}
@@ -376,6 +397,10 @@ namespace TestLite
 			if (node.HasNode("reliabilityCurve")) {
 				reliabilityCurve = new FloatCurve();
 				reliabilityCurve.Load(node.GetNode("reliabilityCurve"));
+			}
+			if (node.HasNode("ignitionCurve")) {
+				ignitionCurve = new FloatCurve();
+				ignitionCurve.Load(node.GetNode("ignitionCurve"));
 			}
 			this.OnAwake();
 			Initialise();
