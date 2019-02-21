@@ -8,19 +8,25 @@ namespace TestLite
 {
 	public class ModuleTestLite : PartModule
 	{
-		[KSPField()]
+		[KSPField(isPersistant = true)]
 		public double in_du = -1;
 		[KSPField()]
+		public double in_du_vab = -1;
+		[KSPField(isPersistant = true)]
 		public double failure_du = 0;
 		[KSPField(isPersistant = false)]
 		public double out_du = 0;
-		[KSPField(isPersistant = false)]
-		public double roll_du = 0;
+		[KSPField(isPersistant = true)]
+		public double roll_du = -1;
+		[KSPField()]
+		public double roll_du_vab = -1;
 
-		[KSPField()]
+		[KSPField(isPersistant = true)]
 		public double clampTime = 0;
-		[KSPField()]
+		[KSPField(isPersistant = true)]
 		public double runTime = 0;
+
+		private bool initialised = false;
 
 		[KSPField()]
 		public double failureRate = 0;
@@ -76,6 +82,18 @@ namespace TestLite
 		[KSPField()]
 		public double techTransferGenerationPenalty = 0.05;
 
+		public double in_du_any {
+			get {
+				return Math.Max(in_du, in_du_vab);
+			}
+		}
+
+		public double roll_du_any {
+			get {
+				return Math.Max(roll_du, roll_du_vab);
+			}
+		}
+
 		public double local_du {
 			get {
 				out_du = Math.Min(in_du + (runTime - clampTime) * dataRate + failure_du, maxData);
@@ -91,8 +109,9 @@ namespace TestLite
 					if (Core.Instance.du.ContainsKey(kvp.Key))
 						transferred += Core.Instance.du[kvp.Key] * kvp.Value;
 				}
+				enumerator.Dispose();
 				transferred = Math.Min(transferred, techTransferMax);
-				return Math.Min(in_du + transferred, maxData);
+				return Math.Min(in_du_any + transferred, maxData);
 			}
 		}
 
@@ -106,8 +125,8 @@ namespace TestLite
 
 		private void updateFailureRate()
 		{
-			failureRate = reliabilityCurve.Evaluate((float)roll_du) * ratedBurnTime;
-			ignitionRate = 1d - ignitionCurve.Evaluate((float)roll_du);
+			failureRate = reliabilityCurve.Evaluate((float)roll_du_any) * ratedBurnTime;
+			ignitionRate = 1d - ignitionCurve.Evaluate((float)roll_du_any);
 		}
 
 		private double rollBathtub(double infantP, double flatP)
@@ -198,8 +217,8 @@ namespace TestLite
 		{
 			bool hadEngine = getEngine();
 			updateFieldsGui(hadEngine, engine != null);
-			if (HighLogic.LoadedSceneIsFlight)
-				Initialise(); /* will do nothing if we're already flying */
+			if (!initialised && Core.Instance != null)
+				Initialise();
 		}
 
 		private void updateCore()
@@ -267,6 +286,11 @@ namespace TestLite
 
 		public void FixedUpdate()
 		{
+			if (in_du < 0d)
+				updateDu();
+			if (!HighLogic.LoadedSceneIsFlight && roll_du_vab < 0d)
+				roll_du_vab = total_du;
+			updateFailureRate();
 			updateMTBF();
 			if (engine != null && engine.finalThrust > 0f) {
 				double oldRunTime = runTime;
@@ -321,32 +345,60 @@ namespace TestLite
 			return hadEngine;
 		}
 
+		private void updateDuVAB()
+		{
+			if (!Core.Instance.du.TryGetValue(configuration, out in_du_vab)) {
+				Logging.LogWarningFormat("Lookup {0} not found, setting 0.", configuration);
+				in_du_vab = 0;
+				Core.Instance.du[configuration] = in_du_vab;
+			} else {
+				Logging.LogFormat("Looked up {0}, found {1}", configuration, in_du_vab);
+			}
+		}
+		private void updateDu()
+		{
+			if (Core.Instance == null) {
+				Logging.LogWarningFormat("No core, can't lookup {0}.", configuration);
+				return;
+			}
+			if (!HighLogic.LoadedSceneIsFlight) {
+				updateDuVAB();
+			} else if (!Core.Instance.du.TryGetValue(configuration, out in_du)) {
+				Logging.LogWarningFormat("Lookup {0} not found, setting 0.", configuration);
+				in_du = 0;
+				Core.Instance.du[configuration] = in_du;
+			} else {
+				Logging.LogFormat("Looked up {0}, found {1}", configuration, in_du);
+			}
+		}
+
 		public void Initialise()
 		{
-			/* This is a mess, caused by stuff maybe getting recorded and persisted from the editor */
-			/* TODO figure out what actually needs to happen here */
-			if (in_du < 0d || !HighLogic.LoadedSceneIsFlight) {
-				if (Core.Instance == null) {
-					Logging.LogWarningFormat("No core, can't lookup {0}.", configuration);
-					return;
-				}
-				if (!Core.Instance.du.TryGetValue(configuration, out in_du)) {
-					Logging.LogWarningFormat("Lookup {0} not found, setting 0.", configuration);
-					in_du = 0;
-					Core.Instance.du[configuration] = in_du;
-				} else {
-					Logging.LogFormat("Looked up {0}, found {1}", configuration, in_du);
+			bool editor = !HighLogic.LoadedSceneIsFlight;
+			bool prelaunch = vessel == null || vessel.situation == Vessel.Situations.PRELAUNCH;
+
+			if (Core.Instance == null)
+				return;
+			Logging.LogFormat("Initialise({0}, {1})", editor, prelaunch);
+			if (in_du < 0d || editor || prelaunch)
+				updateDu();
+			if (editor)
+				roll_du_vab = total_du;
+			else if (prelaunch)
+				roll_du = total_du;
+			if (HighLogic.CurrentGame != null) {
+				TestLiteGameSettings settings = HighLogic.CurrentGame.Parameters.CustomParams<TestLiteGameSettings>();
+				if (settings != null) {
+					preLaunchFailures = settings.preLaunchFailures;
+					determinismMode = settings.determinismMode;
 				}
 			}
-			roll_du = total_du;
-			TestLiteGameSettings settings = HighLogic.CurrentGame.Parameters.CustomParams<TestLiteGameSettings>();
-			preLaunchFailures = settings.preLaunchFailures;
-			determinismMode = settings.determinismMode;
 			updateFailureRate();
-			if (HighLogic.LoadedSceneIsFlight)
+			if (!editor)
 				Roll();
 			updateMTBF();
 			updateFieldsGui(false, engine != null);
+			initialised = true;
 		}
 
 		private void updateFieldsGui(bool had, bool have)
@@ -354,8 +406,8 @@ namespace TestLite
 			if (had == have)
 				return;
 			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
-			Fields["in_du"].guiActive = Fields["in_du"].guiActiveEditor = have && !determinismMode;
-			Fields["roll_du"].guiActive = Fields["roll_du"].guiActiveEditor = have && !determinismMode;
+			Fields["in_du"].guiActive = Fields["in_du_vab"].guiActiveEditor = have && !determinismMode;
+			Fields["roll_du"].guiActive = Fields["roll_du_vab"].guiActiveEditor = have && !determinismMode;
 			Fields["out_du"].guiActive = have && !determinismMode;
 			Fields["runTime"].guiActive = have;
 			Fields["failureRate"].guiActive = have && !determinismMode;
@@ -368,6 +420,9 @@ namespace TestLite
 		{
 			bool hadEngine = getEngine();
 			updateFieldsGui(hadEngine, engine != null);
+			techTransferData = new Dictionary<string, double>();
+			LoadTechTransfer(techTransfer);
+			Initialise();
 		}
 
 		public void LoadTechTransfer(string text)
@@ -401,11 +456,15 @@ namespace TestLite
 			}
 		}
 
+		public override void OnCopy(PartModule fromModule)
+		{
+			base.OnCopy(fromModule);
+			OnAwake();
+		}
+
 		public override void OnLoad(ConfigNode node)
 		{
 			base.OnLoad(node);
-			techTransferData = new Dictionary<string, double>();
-			LoadTechTransfer(techTransfer);
 			if (node.HasNode("reliabilityCurve")) {
 				reliabilityCurve = new FloatCurve();
 				reliabilityCurve.Load(node.GetNode("reliabilityCurve"));
@@ -414,8 +473,7 @@ namespace TestLite
 				ignitionCurve = new FloatCurve();
 				ignitionCurve.Load(node.GetNode("ignitionCurve"));
 			}
-			this.OnAwake();
-			Initialise();
+			OnAwake();
 		}
 	}
 }
