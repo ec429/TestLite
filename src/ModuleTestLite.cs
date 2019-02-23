@@ -286,7 +286,7 @@ namespace TestLite
 
 		public void FixedUpdate()
 		{
-			if (in_du < 0d)
+			if (in_du_any < 0d)
 				updateDu();
 			if (!HighLogic.LoadedSceneIsFlight && roll_du_vab < 0d)
 				roll_du_vab = total_du;
