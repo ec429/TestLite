@@ -64,7 +64,6 @@ namespace TestLite
 
 		[KSPField()]
 		public string configuration;
-		public string oldConfiguration;
 
 		private bool preLaunchFailures = true, determinismMode = false;
 
@@ -120,7 +119,14 @@ namespace TestLite
 
 		public override string GetInfo()
 		{
-			return "TODO put something here.";
+			try {
+				double start = reliabilityCurve.Evaluate(0f) * ratedBurnTime;
+				double end = reliabilityCurve.Evaluate((float)maxData) * ratedBurnTime;
+				return String.Format("{0}: rated {1}s\n{2:P1} at 0du\n{3:P1} at {4}du", configuration, ratedBurnTime, 1d - start, 1d - end, maxData);
+			} catch (Exception exc) {
+				Logging.LogException(exc);
+				return "Erk.";
+			}
 		}
 
 		private void updateFailureRate()
@@ -347,7 +353,9 @@ namespace TestLite
 
 		private void updateDuVAB()
 		{
-			if (!Core.Instance.du.TryGetValue(configuration, out in_du_vab)) {
+			if (Core.Instance == null) {
+				return;
+			} if (!Core.Instance.du.TryGetValue(configuration, out in_du_vab)) {
 				Logging.LogWarningFormat("Lookup {0} not found, setting 0.", configuration);
 				in_du_vab = 0;
 				Core.Instance.du[configuration] = in_du_vab;
