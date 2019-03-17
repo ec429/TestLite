@@ -337,7 +337,6 @@ namespace TestLite
 			}
 			if (mec == null)
 				return hadEngine;
-			Logging.LogFormat("Found MEC using configuration {0} (engineID {1})", configuration, mec.engineID);
 			List<RealFuels.ModuleEnginesRF> merfs = part.FindModulesImplementing<RealFuels.ModuleEnginesRF>();
 			l = merfs.Count;
 			for (i = 0; i < l; i++) {
@@ -346,37 +345,27 @@ namespace TestLite
 					break;
 				}
 			}
-			if (engine != null)
-				Logging.Log("Found MERF too");
 			return hadEngine;
 		}
 
 		private void updateDuVAB()
 		{
-			if (Core.Instance == null) {
+			if (Core.Instance == null)
 				return;
-			} if (!Core.Instance.du.TryGetValue(configuration, out in_du_vab)) {
-				Logging.LogWarningFormat("Lookup {0} not found, setting 0.", configuration);
+			if (!Core.Instance.du.TryGetValue(configuration, out in_du_vab)) {
 				in_du_vab = 0;
 				Core.Instance.du[configuration] = in_du_vab;
-			} else {
-				Logging.LogFormat("Looked up {0}, found {1}", configuration, in_du_vab);
 			}
 		}
 		private void updateDu()
 		{
-			if (Core.Instance == null) {
-				Logging.LogWarningFormat("No core, can't lookup {0}.", configuration);
+			if (Core.Instance == null)
 				return;
-			}
 			if (!HighLogic.LoadedSceneIsFlight) {
 				updateDuVAB();
 			} else if (!Core.Instance.du.TryGetValue(configuration, out in_du)) {
-				Logging.LogWarningFormat("Lookup {0} not found, setting 0.", configuration);
 				in_du = 0;
 				Core.Instance.du[configuration] = in_du;
-			} else {
-				Logging.LogFormat("Looked up {0}, found {1}", configuration, in_du);
 			}
 		}
 
@@ -387,7 +376,6 @@ namespace TestLite
 
 			if (Core.Instance == null)
 				return;
-			Logging.LogFormat("Initialise({0}, {1})", editor, prelaunch);
 			if (in_du < 0d || editor || prelaunch)
 				updateDu();
 			if (editor)
