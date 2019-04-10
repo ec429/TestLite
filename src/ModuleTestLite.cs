@@ -14,11 +14,11 @@ namespace TestLite
 		public double in_du_vab = -1;
 		[KSPField(isPersistant = true)]
 		public double failure_du = 0;
-		[KSPField(isPersistant = false)]
+		[KSPField(isPersistant = false, guiFormat = "F1", guiUnits = "du", guiName = "Collected data")]
 		public double out_du = 0;
-		[KSPField(isPersistant = true)]
+		[KSPField(isPersistant = true, guiFormat = "F1", guiUnits = "du", guiName = "Data at launch")]
 		public double roll_du = -1;
-		[KSPField()]
+		[KSPField(guiFormat = "F1", guiUnits = "du", guiName = "Data (incl. transfer)")]
 		public double roll_du_vab = -1;
 
 		[KSPField(isPersistant = true)]
@@ -28,9 +28,9 @@ namespace TestLite
 
 		private bool initialised = false;
 
-		[KSPField()]
+		[KSPField(guiFormat = "P2", guiName = "Full-burn failure rate")]
 		public double failureRate = 0;
-		[KSPField()]
+		[KSPField(guiFormat = "P2", guiName = "Ignition failure rate")]
 		public double ignitionRate = 0; // P(ignition failure)
 
 		[KSPField()]
@@ -57,7 +57,7 @@ namespace TestLite
 
 		public bool transient_failure = false, minor_failure = false, major_failure = false;
 
-		[KSPField()]
+		[KSPField(guiUnits = "s", guiName = "Rated burntime")]
 		public double ratedBurnTime;
 		[KSPField()]
 		public double dataRate = 1.0;
@@ -402,14 +402,11 @@ namespace TestLite
 			if (had == have)
 				return;
 			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
-			Fields["in_du"].guiActive = Fields["in_du_vab"].guiActiveEditor = have && !determinismMode;
 			Fields["roll_du"].guiActive = Fields["roll_du_vab"].guiActiveEditor = have && !determinismMode;
 			Fields["out_du"].guiActive = have && !determinismMode;
-			Fields["runTime"].guiActive = have;
-			Fields["failureRate"].guiActive = have && !determinismMode;
 			Fields["ignitionRate"].guiActive = Fields["ignitionRate"].guiActiveEditor = have && !determinismMode;
-			Fields["fstar"].guiActive = have && !determinismMode;
 			Fields["MTBF"].guiActive = Fields["MTBF"].guiActiveEditor = have && !determinismMode;
+			Fields["failureRate"].guiActiveEditor = have && !determinismMode;
 		}
 
 		public override void OnAwake()
