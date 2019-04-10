@@ -6,7 +6,7 @@ using System.Text;
 
 namespace TestLite
 {
-	public class ModuleTestLite : PartModule
+	public class ModuleTestLite : PartModule, IPartCostModifier
 	{
 		[KSPField(isPersistant = true)]
 		public double in_du = -1;
@@ -25,6 +25,33 @@ namespace TestLite
 		public double clampTime = 0;
 		[KSPField(isPersistant = true)]
 		public double runTime = 0;
+
+		[KSPField(isPersistant = true)]
+		public bool telemetry = false;
+		public void setTelemetry(bool v)
+		{
+			telemetry = v;
+			Events["EventTelemetry"].guiName = telemetry ? "Disable Extra Telemetry" : "Enable Extra Telemetry";
+		}
+		[KSPEvent(guiName = "Enable Extra Telemetry")]
+		public void EventTelemetry()
+		{
+			setTelemetry(!telemetry);
+		}
+		[KSPField(isPersistant = true)]
+		public bool preflight = false;
+		public void setPreflight(bool v)
+		{
+			preflight = v;
+			Events["EventPreflight"].guiName = preflight ? "Disable Extra Preflight" : "Enable Extra Preflight";
+			updateFailureRate();
+		}
+		[KSPEvent(guiName = "Enable Extra Preflight")]
+		public void EventPreflight()
+		{
+			bool nv = !preflight;
+			setPreflight(nv);
+		}
 
 		private bool initialised = false;
 
@@ -81,6 +108,23 @@ namespace TestLite
 		[KSPField()]
 		public double techTransferGenerationPenalty = 0.05;
 
+		#region IPartCostModifier implementation
+
+		public float GetModuleCost(float defaultCost, ModifierStagingSituation sit)
+		{
+			if (!engine)
+				return 0f;
+			float multiplier = (telemetry ? 2f : 0f) + (preflight ? 1f : 0f);
+			return multiplier * defaultCost;
+		}
+
+		public ModifierChangeWhen GetModuleCostChangeWhen()
+		{
+			return ModifierChangeWhen.FIXED;
+		}
+
+		#endregion
+
 		public double in_du_any {
 			get {
 				return Math.Max(in_du, in_du_vab);
@@ -95,7 +139,9 @@ namespace TestLite
 
 		public double local_du {
 			get {
-				out_du = Math.Min(in_du + (runTime - clampTime) * dataRate + failure_du, maxData);
+				float dataMultiplier = telemetry ? 2f : 1f;
+				double add_du = (runTime - clampTime) * dataRate + failure_du;
+				out_du = Math.Min(in_du + add_du * dataMultiplier, maxData);
 				return out_du;
 			}
 		}
@@ -131,8 +177,9 @@ namespace TestLite
 
 		private void updateFailureRate()
 		{
-			failureRate = reliabilityCurve.Evaluate((float)roll_du_any) * ratedBurnTime;
-			ignitionRate = 1d - ignitionCurve.Evaluate((float)roll_du_any);
+			float pfMult = preflight ? 0.75f : 1f;
+			failureRate = reliabilityCurve.Evaluate((float)roll_du_any) * ratedBurnTime * pfMult;
+			ignitionRate = (1d - ignitionCurve.Evaluate((float)roll_du_any)) * pfMult;
 		}
 
 		private double rollBathtub(double infantP, double flatP)
@@ -394,6 +441,8 @@ namespace TestLite
 				Roll();
 			updateMTBF();
 			updateFieldsGui(false, engine != null);
+			setTelemetry(telemetry);
+			setPreflight(preflight);
 			initialised = true;
 		}
 
@@ -407,6 +456,8 @@ namespace TestLite
 			Fields["ignitionRate"].guiActive = Fields["ignitionRate"].guiActiveEditor = have && !determinismMode;
 			Fields["MTBF"].guiActive = Fields["MTBF"].guiActiveEditor = have && !determinismMode;
 			Fields["failureRate"].guiActiveEditor = have && !determinismMode;
+			Events["EventTelemetry"].guiActiveEditor = have && !determinismMode;
+			Events["EventPreflight"].guiActiveEditor = have && !determinismMode;
 		}
 
 		public override void OnAwake()
@@ -451,7 +502,10 @@ namespace TestLite
 
 		public override void OnCopy(PartModule fromModule)
 		{
+			ModuleTestLite from = fromModule as ModuleTestLite;
 			base.OnCopy(fromModule);
+			setTelemetry(from.telemetry);
+			setPreflight(from.preflight);
 			OnAwake();
 		}
 

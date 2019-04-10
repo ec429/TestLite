@@ -30,3 +30,7 @@ Performance loss: Porch 0.04p, 0.25p.  Isp reduced by factor ~ U[0.4, 0.6].
 Thrust loss: Porch 0.03p, 0.2p.  Thrust reduced by factor ~ U[0.4, 0.6].
 TOTALS: 0.15p + 0.85p = p
 Ignition failure: event, driven by ignitionReliability.  Doesn't wipe out remaining ignitions.
+
+Optionally, can give engines an Extra Preflight Check; doubles cost, reduces failures (within burntime) by 25%.
+Optionally, can add Extra Telemetry to engines; trebles cost, doubles dataRate.
+(With both, the multipliers add; i.e. 4x cost, not 6x.)
