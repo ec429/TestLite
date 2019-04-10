@@ -7,8 +7,8 @@ It's a lightweight replacement for other part-failure mods like TestFlight,
  (hopefully) better performance.  It is designed for use with the Realism
  Overhaul suite of mods.
 
-TestLite is currently in alpha; it's had little testing, and currently shows
- a lot of debugging info to the user.
+TestLite is currently in beta; it hasn't had much testing, and there may
+ still be one or two missing features.
 
 TestLite is developed by Edward Cree, aka 'soundnfury'.
 
