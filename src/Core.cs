@@ -146,6 +146,8 @@ namespace TestLite
 		public override int SectionOrder { get { return 1; } }
 		public override bool HasPresets { get { return true; } }
 
+		[GameParameters.CustomParameterUI("Disable TestLite", toolTip = "Set to disable all engine failures and du collection.")]
+		public bool disabled = false;
 		[GameParameters.CustomParameterUI("Deterministic mode", toolTip = "No ignition failures, engines always run for rated burn time then die.  du is irrelevant.")]
 		public bool determinismMode = false;
 		[GameParameters.CustomParameterUI("Pre-Launch Ignition Failures Enabled?", toolTip = "Set to enable ignition failures on the Launch Pad.")]
@@ -153,7 +155,9 @@ namespace TestLite
 
 		public override void SetDifficultyPreset(GameParameters.Preset preset)
 		{
-			Logging.Log("Setting difficulty preset");
+			if (preset == GameParameters.Preset.Custom)
+				return; /* Leave whatever was set before */
+			disabled = false;
 			switch (preset) {
 			case GameParameters.Preset.Easy:
 				determinismMode = true;
@@ -165,7 +169,6 @@ namespace TestLite
 				break;
 			case GameParameters.Preset.Moderate:
 			case GameParameters.Preset.Hard:
-			case GameParameters.Preset.Custom:
 			default:
 				determinismMode = false;
 				preLaunchFailures = true;

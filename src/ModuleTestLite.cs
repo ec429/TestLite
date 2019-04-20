@@ -92,7 +92,7 @@ namespace TestLite
 		[KSPField()]
 		public string configuration;
 
-		private bool preLaunchFailures = true, determinismMode = false;
+		private bool preLaunchFailures = true, determinismMode = false, disableTestLite = false;
 
 		[KSPField()]
 		public double maxData;
@@ -434,6 +434,7 @@ namespace TestLite
 				if (settings != null) {
 					preLaunchFailures = settings.preLaunchFailures;
 					determinismMode = settings.determinismMode;
+					disableTestLite = settings.disabled;
 				}
 			}
 			updateFailureRate();
@@ -450,6 +451,10 @@ namespace TestLite
 		{
 			if (had == have)
 				return;
+			if (have && disableTestLite) {
+				have = false;
+				engine = null;
+			}
 			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
 			Fields["roll_du"].guiActive = Fields["roll_du_vab"].guiActiveEditor = have && !determinismMode;
 			Fields["out_du"].guiActive = have && !determinismMode;
