@@ -115,7 +115,8 @@ namespace TestLite
 			if (!engine)
 				return 0f;
 			float multiplier = (telemetry ? 2f : 0f) + (preflight ? 1f : 0f);
-			return multiplier * defaultCost;
+			float baseCost = part.partInfo.cost + (mec ? mec.GetModuleCost(defaultCost, sit) : 0f);
+			return multiplier * baseCost;
 		}
 
 		public ModifierChangeWhen GetModuleCostChangeWhen()
