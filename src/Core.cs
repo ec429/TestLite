@@ -11,13 +11,8 @@ namespace TestLite
 	public class Core : MonoBehaviour
 	{
 		public static Core Instance { get; protected set; }
-		private ApplicationLauncherButton button = null;
 		public System.Random rand;
 		public Dictionary<string, double> du;
-		/* TODO add a GUI when we have stuff to put in it
-		private UI.MasterWindow masterWindow;
-		private UI.ConfigWindow configWindow;
-		*/
 
 		public void Start()
 		{
@@ -34,66 +29,9 @@ namespace TestLite
 			Logging.Log("Core loaded successfully");
 		}
 
-		protected void Awake()
-		{
-			try {
-				GameEvents.onGUIApplicationLauncherReady.Add(this.OnGuiAppLauncherReady);
-			} catch (Exception ex) {
-				Logging.LogException(ex);
-			}
-		}
-
-		public void OnGUI()
-		{
-			GUI.depth = 0;
-
-			Action windows = delegate { };
-			foreach (var window in UI.AbstractWindow.Windows.Values)
-				windows += window.Draw;
-			windows.Invoke();
-		}
-
-		private void OnGuiAppLauncherReady()
-		{
-			try {
-				/*
-				button = ApplicationLauncher.Instance.AddModApplication(
-					masterWindow.Show,
-					HideGUI,
-					null,
-					null,
-					null,
-					null,
-					ApplicationLauncher.AppScenes.VAB | ApplicationLauncher.AppScenes.SPH,
-					GameDatabase.Instance.GetTexture("TestLite/Textures/toolbar_icon", false));
-				GameEvents.onGameSceneLoadRequested.Add(this.OnSceneChange);
-				*/
-			} catch (Exception ex) {
-				Logging.LogException(ex);
-			}
-		}
-
-		private void HideGUI()
-		{
-			foreach (var window in UI.AbstractWindow.Windows.Values)
-				window.Hide();
-		}
-
-		private void OnSceneChange(GameScenes s)
-		{
-			HideGUI();
-		}
-
 		public void OnDestroy()
 		{
 			Instance = null;
-			try {
-				GameEvents.onGUIApplicationLauncherReady.Remove(this.OnGuiAppLauncherReady);
-				if (button != null)
-					ApplicationLauncher.Instance.RemoveModApplication(button);
-			} catch (Exception ex) {
-				Logging.LogException(ex);
-			}
 		}
 
 		public void Save(ConfigNode node)

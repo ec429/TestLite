@@ -3,7 +3,7 @@ KSPDTA := $(HOME)/ksp/GameData/
 BINDIR := bin
 OUTDIR := ../GameData/TestLite/Plugins
 
-SOURCES := Core.cs Util.cs ModuleTestLite.cs Properties/AssemblyInfo.cs UI/AbstractWindow.cs
+SOURCES := Core.cs Util.cs ModuleTestLite.cs Properties/AssemblyInfo.cs
 
 all: $(OUTDIR)/TestLite.dll
 
