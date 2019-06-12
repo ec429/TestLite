@@ -455,11 +455,11 @@ namespace TestLite
 
 			if (had == have)
 				return;
-			if (have && disableTestLite)
-			{
+			if (have && disableTestLite) {
 				have = false;
 				engine = null;
-			}			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
+			}
+			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
 			Fields["roll_du"].guiActive = Fields["roll_du_vab"].guiActiveEditor = have && !determinismMode;
 			Fields["out_du"].guiActive = have && !determinismMode;
 			Fields["ignitionRate"].guiActive = Fields["ignitionRate"].guiActiveEditor = have && !determinismMode;
