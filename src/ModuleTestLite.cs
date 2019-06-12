@@ -37,6 +37,7 @@ namespace TestLite
 		public void EventTelemetry()
 		{
 			setTelemetry(!telemetry);
+            GameEvents.onEditorShipModified.Fire(EditorLogic.fetch.ship);
 		}
 		[KSPField(isPersistant = true)]
 		public bool preflight = false;
@@ -45,12 +46,13 @@ namespace TestLite
 			preflight = v;
 			Events["EventPreflight"].guiName = preflight ? "Disable Extra Preflight" : "Enable Extra Preflight";
 			updateFailureRate();
-		}
+        }
 		[KSPEvent(guiName = "Enable Extra Preflight")]
 		public void EventPreflight()
 		{
 			bool nv = !preflight;
 			setPreflight(nv);
+            GameEvents.onEditorShipModified.Fire(EditorLogic.fetch.ship);
 		}
 
 		private bool initialised = false;
@@ -269,6 +271,18 @@ namespace TestLite
 
 		public void Update()
 		{
+			if (HighLogic.CurrentGame != null)
+			{
+				TestLiteGameSettings settings = HighLogic.CurrentGame.Parameters.CustomParams<TestLiteGameSettings>();
+				if (settings != null)
+				{
+					if (disableTestLite != settings.disabled)
+					{
+						Logging.LogWarningFormat("TestLite changed disabled state = {0}", disableTestLite);
+						disableTestLite = settings.disabled;
+					}
+				}
+			}
 			bool hadEngine = getEngine();
 			updateFieldsGui(hadEngine, engine != null);
 			if (!initialised && Core.Instance != null)
@@ -436,6 +450,7 @@ namespace TestLite
 					preLaunchFailures = settings.preLaunchFailures;
 					determinismMode = settings.determinismMode;
 					disableTestLite = settings.disabled;
+					Logging.LogWarningFormat("TestLite disabled state = {0}", disableTestLite);
 				}
 			}
 			updateFailureRate();
@@ -450,12 +465,13 @@ namespace TestLite
 
 		private void updateFieldsGui(bool had, bool have)
 		{
-			if (had == have)
-				return;
-			if (have && disableTestLite) {
+			if (have && disableTestLite)
+			{
 				have = false;
 				engine = null;
 			}
+			if (had == have)
+				return;
 			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
 			Fields["roll_du"].guiActive = Fields["roll_du_vab"].guiActiveEditor = have && !determinismMode;
 			Fields["out_du"].guiActive = have && !determinismMode;
