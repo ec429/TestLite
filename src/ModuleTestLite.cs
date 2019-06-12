@@ -269,18 +269,6 @@ namespace TestLite
 
 		public void Update()
 		{
-			if (HighLogic.CurrentGame != null)
-			{
-				TestLiteGameSettings settings = HighLogic.CurrentGame.Parameters.CustomParams<TestLiteGameSettings>();
-				if (settings != null)
-				{
-					if (disableTestLite != settings.disabled)
-					{
-						Logging.LogWarningFormat("TestLite changed disabled state = {0}", disableTestLite);
-						disableTestLite = settings.disabled;
-					}
-				}
-			}
 			bool hadEngine = getEngine();
 			updateFieldsGui(hadEngine, engine != null);
 			if (!initialised && Core.Instance != null)
@@ -448,7 +436,6 @@ namespace TestLite
 					preLaunchFailures = settings.preLaunchFailures;
 					determinismMode = settings.determinismMode;
 					disableTestLite = settings.disabled;
-					Logging.LogWarningFormat("TestLite disabled state = {0}", disableTestLite);
 				}
 			}
 			updateFailureRate();
