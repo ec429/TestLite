@@ -452,7 +452,6 @@ namespace TestLite
 
 		private void updateFieldsGui(bool had, bool have)
 		{
-
 			if (had == have)
 				return;
 			if (have && disableTestLite) {
