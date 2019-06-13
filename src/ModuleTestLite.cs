@@ -450,12 +450,13 @@ namespace TestLite
 
 		private void updateFieldsGui(bool had, bool have)
 		{
-			if (had == have)
-				return;
-			if (have && disableTestLite) {
+			if (have && disableTestLite)
+			{
 				have = false;
 				engine = null;
 			}
+			if (had == have)
+				return;
 			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
 			Fields["roll_du"].guiActive = Fields["roll_du_vab"].guiActiveEditor = have && !determinismMode;
 			Fields["out_du"].guiActive = have && !determinismMode;
