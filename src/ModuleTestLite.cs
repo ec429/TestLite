@@ -37,6 +37,7 @@ namespace TestLite
 		public void EventTelemetry()
 		{
 			setTelemetry(!telemetry);
+			GameEvents.onEditorShipModified.Fire(EditorLogic.fetch.ship);
 		}
 		[KSPField(isPersistant = true)]
 		public bool preflight = false;
@@ -51,6 +52,7 @@ namespace TestLite
 		{
 			bool nv = !preflight;
 			setPreflight(nv);
+			GameEvents.onEditorShipModified.Fire(EditorLogic.fetch.ship);
 		}
 
 		private bool initialised = false;
