@@ -307,6 +307,7 @@ namespace TestLite
 			updateCore(); /* Make sure we save our failureData, just in case we explode the part */
 			Logging.LogFormat("Failing engine {0}: {1}", configuration, ft.ToString());
 			ScreenMessages.PostScreenMessage(String.Format("[TestLite] {0} on {1}", failureDescription[type], configuration), 5f);
+			FlightLogger.eventLog.Add(String.Format("[{0}] {1} on {2}", KSPUtil.PrintTimeCompact((int)Math.Floor(this.vessel.missionTime), false), failureDescription[type], configuration));
 			switch (severityType[type]) {
 			case 0:
 				transient_failure = true;
