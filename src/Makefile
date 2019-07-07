@@ -12,3 +12,6 @@ $(BINDIR)/TestLite.dll: $(SOURCES)
 
 $(OUTDIR)/TestLite.dll: $(BINDIR)/TestLite.dll
 	cp $< $@
+
+clean:
+	-rm $(OUTDIR)/TestLite.dll $(BINDIR)/TestLite.dll
