@@ -293,7 +293,7 @@ namespace TestLite
 				fstar += fStar(infantPFactor[i] * failureRate,
 					       flatPFactor[i] * failureRate,
 					       bathtubType[i]);
-			double mtbf = 1d / Math.Max(fstar, 1e-12);
+			double mtbf = 0.5d / Math.Max(fstar, 1e-12);
 			if (mtbf < 1200)
 				MTBF = String.Format("{0:0.#}s", mtbf);
 			else
