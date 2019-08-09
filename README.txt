@@ -27,8 +27,7 @@ How do I install it?
 --------------------
 
 Assuming you've installed all the dependencies (see above), copy the
- GameData/TestLite folder into your KSP install's GameData/, then delete
- GameData/RealismOverhaul/TestFlight_Generic_Engines.cfg.
+ GameData/TestLite folder into your KSP install's GameData/.
 
 Where do I report bugs?
 -----------------------
