@@ -36,3 +36,11 @@ Open an issue on the project's GitHub page,
 	https://github.com/ec429/TestLite/issues
 Sometimes the developer will be on IRC as soundnfury on irc.esper.net, or on
  the KSP-RO Discord server under the same nickname.
+
+Acknowledgements
+----------------
+
+TestLite could never have existed without the example set by John Vanderbeck
+ (Agathorn), whose original TestFlight mod created the basic concepts used
+ here, and who produced most of the original engine reliability configs for
+ Realism Overhaul (which TestLite now consumes).
