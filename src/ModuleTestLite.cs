@@ -226,6 +226,16 @@ namespace TestLite
 			return 5 - Math.Log(1d - zoner) / kappa;
 		}
 
+		private double rollOne(int i)
+		{
+			if (bathtubType[i])
+				return rollBathtub(infantPFactor[i] * failureRate,
+						   flatPFactor[i] * failureRate);
+			else
+				return rollPorch(infantPFactor[i] * failureRate,
+						 flatPFactor[i] * failureRate);
+		}
+
 		public void Roll()
 		{
 			if (failureTime[0] >= 0d)
@@ -239,14 +249,21 @@ namespace TestLite
 				return;
 			}
 			for (int i = 0; i < (int)failureTypes.IGNITION; i++) {
-				if (bathtubType[i])
-					failureTime[i] = rollBathtub(infantPFactor[i] * failureRate,
-								     flatPFactor[i] * failureRate);
-				else
-					failureTime[i] = rollPorch(infantPFactor[i] * failureRate,
-								   flatPFactor[i] * failureRate);
+				failureTime[i] = rollOne(i);
 				if (engine != null)
 					Logging.LogFormat("Rolled {0} at {1}", ((failureTypes)i).ToString(), failureTime[i]);
+			}
+		}
+
+		public void ReRoll()
+		{
+			if (engine == null) return;
+			for (int i = 0; i < (int)failureTypes.IGNITION; i++) {
+				double time = rollOne(i) + runTime;
+				if (time < failureTime[i]) {
+					failureTime[i] = time;
+					Logging.LogFormat("Re-rolled {0} at {1} (fraternal damage)", ((failureTypes)i).ToString(), failureTime[i]);
+				}
 			}
 		}
 
@@ -302,6 +319,17 @@ namespace TestLite
 				MTBF = String.Format("{0:0.##}m", mtbf / 60.0);
 		}
 
+		private void fraternalDamage()
+		{
+			/* Other engines running at the same time (so, putatively, in the same stage) get extra chances to fail */
+			foreach (Part p in vessel.parts) {
+				foreach (ModuleTestLite tl in p.FindModulesImplementing<ModuleTestLite>()) {
+					if (tl.initialised && tl.running)
+						tl.ReRoll();
+				}
+			}
+		}
+
 		private void triggerFailure(int type)
 		{
 			if (isSolid) { /* Map non-solid-appropriate failureTypes to more suitable ones */
@@ -337,8 +365,11 @@ namespace TestLite
 				engine.Shutdown();
 				/* It's permanently dead.  It might even explode. */
 				engine.ignitions = 0;
-				if (isSolid || Core.Instance.rand.Next(3) == 0) /* Solids always explode */
+				if (isSolid || Core.Instance.rand.Next(3) == 0) { /* Solids always explode */
 					part.explode();
+					if (!determinismMode)
+						fraternalDamage();
+				}
 				break;
 			case failureTypes.PERFLOSS:
 				engine.ispMult *= 0.4d + Core.Instance.rand.NextDouble() * 0.2d;
