@@ -109,6 +109,8 @@ namespace TestLite
 		public float techTransferMax = 1000;
 		[KSPField()]
 		public double techTransferGenerationPenalty = 0.05;
+		[KSPField()]
+		public bool isSolid = false;
 
 		#region IPartCostModifier implementation
 
@@ -302,6 +304,13 @@ namespace TestLite
 
 		private void triggerFailure(int type)
 		{
+			if (isSolid) { /* Map non-solid-appropriate failureTypes to more suitable ones */
+				if (type == (int)failureTypes.TRANSIENT) {
+					type = (int)failureTypes.PERMANENT;
+				} else if (type == (int)failureTypes.THRUSTLOSS) {
+					type = (int)failureTypes.PERFLOSS;
+				}
+			}
 			failure_du += failureData[type];
 			failureTypes ft = (failureTypes)type;
 			updateCore(); /* Make sure we save our failureData, just in case we explode the part */
@@ -328,7 +337,7 @@ namespace TestLite
 				engine.Shutdown();
 				/* It's permanently dead.  It might even explode. */
 				engine.ignitions = 0;
-				if (Core.Instance.rand.Next(3) == 0)
+				if (isSolid || Core.Instance.rand.Next(3) == 0) /* Solids always explode */
 					part.explode();
 				break;
 			case failureTypes.PERFLOSS:
