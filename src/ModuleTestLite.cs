@@ -460,6 +460,18 @@ namespace TestLite
 			}
 		}
 
+		private void clearFlightState()
+		{
+			/* In case we were KCT-recovered, clear any Flight state on Editor initialisation. */
+			major_failure = minor_failure = transient_failure = false;
+			runTime = clampTime = 0;
+			in_du = roll_du = -1;
+			failure_du = 0;
+			for (int i = 0; i < (int)failureTypes.IGNITION; i++)
+				failureTime[i] = -1;
+			running = false;
+		}
+
 		public void Initialise()
 		{
 			bool editor = !HighLogic.LoadedSceneIsFlight;
@@ -467,6 +479,8 @@ namespace TestLite
 
 			if (Core.Instance == null)
 				return;
+			if (editor)
+				clearFlightState();
 			if (in_du < 0d || editor || prelaunch)
 				updateDu();
 			if (editor)
