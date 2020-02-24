@@ -95,6 +95,7 @@ namespace TestLite
 		public string configuration;
 
 		private bool preLaunchFailures = true, determinismMode = false, disableTestLite = false;
+		private float startingDu = 0;
 
 		[KSPField()]
 		public double maxData;
@@ -303,7 +304,7 @@ namespace TestLite
 			if (Core.Instance == null)
 				return;
 			if (!Core.Instance.du.ContainsKey(configuration)) /* should never happen */
-				Core.Instance.du[configuration] = 0d;
+				Core.Instance.du[configuration] = startingDu;
 			Core.Instance.du[configuration] = Math.Max(local_du, Core.Instance.du[configuration]);
 		}
 
@@ -446,7 +447,7 @@ namespace TestLite
 			if (Core.Instance == null)
 				return;
 			if (!Core.Instance.du.TryGetValue(configuration, out in_du_vab)) {
-				in_du_vab = 0;
+				in_du_vab = startingDu;
 				Core.Instance.du[configuration] = in_du_vab;
 			}
 		}
@@ -457,7 +458,7 @@ namespace TestLite
 			if (!HighLogic.LoadedSceneIsFlight) {
 				updateDuVAB();
 			} else if (!Core.Instance.du.TryGetValue(configuration, out in_du)) {
-				in_du = 0;
+				in_du = startingDu;
 				Core.Instance.du[configuration] = in_du;
 			}
 		}
@@ -481,6 +482,15 @@ namespace TestLite
 
 			if (Core.Instance == null)
 				return;
+			if (HighLogic.CurrentGame != null) {
+				TestLiteGameSettings settings = HighLogic.CurrentGame.Parameters.CustomParams<TestLiteGameSettings>();
+				if (settings != null) {
+					preLaunchFailures = settings.preLaunchFailures;
+					determinismMode = settings.determinismMode;
+					disableTestLite = settings.disabled;
+					startingDu = settings.startingDu;
+				}
+			}
 			if (editor)
 				clearFlightState();
 			if (in_du < 0d || editor || prelaunch)
@@ -489,14 +499,6 @@ namespace TestLite
 				roll_du_vab = total_du;
 			else if (prelaunch)
 				roll_du = total_du;
-			if (HighLogic.CurrentGame != null) {
-				TestLiteGameSettings settings = HighLogic.CurrentGame.Parameters.CustomParams<TestLiteGameSettings>();
-				if (settings != null) {
-					preLaunchFailures = settings.preLaunchFailures;
-					determinismMode = settings.determinismMode;
-					disableTestLite = settings.disabled;
-				}
-			}
 			updateFailureRate();
 			if (!editor)
 				Roll();
