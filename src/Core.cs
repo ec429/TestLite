@@ -90,12 +90,15 @@ namespace TestLite
 		public bool determinismMode = false;
 		[GameParameters.CustomParameterUI("Pre-Launch Ignition Failures Enabled?", toolTip = "Set to enable ignition failures on the Launch Pad.")]
 		public bool preLaunchFailures = true;
+		[GameParameters.CustomFloatParameterUI("Start with du", minValue = 0, maxValue = 10000, stepCount = 21, toolTip = "Set to have engines start at this du.")]
+		public float startingDu = 0;
 
 		public override void SetDifficultyPreset(GameParameters.Preset preset)
 		{
 			if (preset == GameParameters.Preset.Custom)
 				return; /* Leave whatever was set before */
 			disabled = false;
+			startingDu = 0;
 			switch (preset) {
 			case GameParameters.Preset.Easy:
 				determinismMode = true;
