@@ -96,19 +96,17 @@ namespace TestLite
 			if (preset == GameParameters.Preset.Custom)
 				return; /* Leave whatever was set before */
 			disabled = false;
+			determinismMode = false;
 			switch (preset) {
 			case GameParameters.Preset.Easy:
-				determinismMode = true;
 				preLaunchFailures = false;
 				break;
 			case GameParameters.Preset.Normal:
-				determinismMode = false;
 				preLaunchFailures = false;
 				break;
 			case GameParameters.Preset.Moderate:
 			case GameParameters.Preset.Hard:
 			default:
-				determinismMode = false;
 				preLaunchFailures = true;
 				break;
 			}
