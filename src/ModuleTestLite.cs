@@ -341,7 +341,12 @@ namespace TestLite
 					type = (int)failureTypes.PERFLOSS;
 				}
 			}
-			failure_du += failureData[type];
+            // No failure data until the craft has launched
+            if (runTime > clampTime)
+            {
+                // Roll off data above rated run time, to a minimum of 10%
+			    failure_du += failureData[type] * Math.Min(Math.Sqrt(Math.Max(2d - runTime / ratedBurnTime, 0.01d)), 1d);
+            }
 			failureTypes ft = (failureTypes)type;
 			updateCore(); /* Make sure we save our failureData, just in case we explode the part */
 			Logging.LogFormat("Failing engine {0}: {1}", configuration, ft.ToString());
