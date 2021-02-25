@@ -535,6 +535,18 @@ namespace TestLite
 			Initialise();
 		}
 
+		public override void OnStartFinished(StartState state)
+		{
+			base.OnStartFinished(state);
+			if (HighLogic.LoadedSceneIsFlight)
+				GameEvents.OnGameSettingsApplied.Add(Initialise);
+		}
+
+		public void OnDestroy()
+		{
+			GameEvents.OnGameSettingsApplied.Remove(Initialise);
+		}
+
 		public void LoadTechTransfer(string text)
 		{
 			if (string.IsNullOrEmpty(text))
