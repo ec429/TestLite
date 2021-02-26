@@ -29,6 +29,17 @@ How do I install it?
 Assuming you've installed all the dependencies (see above), copy the
  GameData/TestLite folder into your KSP install's GameData/.
 
+How do I build it?
+------------------
+
+If you want to help develop TestLite, there are two ways to compile it from
+ source.  The canonical and supported way is through the Unix makefile;
+ ensure that $(HOME)/ksp is a KSP install (or more likely, a symlink to it),
+ then run 'make' in src/.  The DLL will be copied into GameData.
+As an alternative, Windows users can build with the VS solution file; this
+ was provided by siimav <siim.aaver@gmail.com>, so go pester him if it
+ doesn't work — soundnfury is unable to provide support.
+
 Where do I report bugs?
 -----------------------
 
