@@ -175,7 +175,9 @@ namespace TestLite
 			try {
 				double start = reliabilityCurve.Evaluate(0f) * ratedBurnTime;
 				double end = reliabilityCurve.Evaluate((float)maxData) * ratedBurnTime;
-				return String.Format("{0}: rated {1}s\n{2:P1} at 0du\n{3:P1} at {4}du", configuration, ratedBurnTime, 1d - start, 1d - end, maxData);
+				double istart = ignitionCurve.Evaluate(0f);
+				double iend = ignitionCurve.Evaluate((float)maxData);
+				return String.Format("{0}: rated {1}s\ncycle {2:P1} -> {3:P1}\nignition {4:P1} -> {5:P1}", configuration, ratedBurnTime, 1d - start, 1d - end, istart, iend);
 			} catch (Exception exc) {
 				Logging.LogException(exc);
 				return "Erk.";

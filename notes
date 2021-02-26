@@ -36,8 +36,3 @@ Optionally, can add Extra Telemetry to engines; doubles cost, doubles dataRate.
 (With both, the multipliers add; i.e. 3x cost, not 4x.)
 
 Fraternal damage: if an engine explodes, all other engines running at the time get a reroll: compute a new failure time (with t = 0 at the point of the explosion), take whichever failure-time is sooner.
-
-TODO
-lpg: how about something like
-`    85%->95% full-burn
-`    70%->80% ignition
