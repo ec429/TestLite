@@ -417,6 +417,11 @@ namespace TestLite
 		public bool getEngine()
 		{
 			bool hadEngine = (engine != null);
+			if (disableTestLite) {
+				engine = null;
+				mec = null;
+				return hadEngine;
+			}
 			if (mec != null && mec.configuration.Equals(configuration))
 				/* No change, nothing to do */
 				return hadEngine;
@@ -503,7 +508,8 @@ namespace TestLite
 			if (!editor)
 				Roll();
 			updateMTBF();
-			updateFieldsGui(false, engine != null);
+			bool hadEngine = getEngine();
+			updateFieldsGui(hadEngine, engine != null);
 			setTelemetry(telemetry);
 			setPreflight(preflight);
 			initialised = true;
@@ -511,11 +517,6 @@ namespace TestLite
 
 		private void updateFieldsGui(bool had, bool have)
 		{
-			if (have && disableTestLite)
-			{
-				have = false;
-				engine = null;
-			}
 			if (had == have)
 				return;
 			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
