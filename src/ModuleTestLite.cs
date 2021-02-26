@@ -147,7 +147,8 @@ namespace TestLite
 		public double local_du {
 			get {
 				float dataMultiplier = telemetry ? 2f : 1f;
-				double add_du = (runTime - clampTime) * dataRate + failure_du;
+				double goodTime = Math.Min(runTime, ratedBurnTime + 5.0);
+				double add_du = Math.Max(goodTime - clampTime, 0.0) * dataRate + failure_du;
 				out_du = Math.Min(in_du + add_du * dataMultiplier, maxData);
 				return out_du;
 			}
@@ -343,7 +344,8 @@ namespace TestLite
 					type = (int)failureTypes.PERFLOSS;
 				}
 			}
-			failure_du += failureData[type];
+			double fdScale = Math.Min(1.0, (ratedBurnTime * 2.0 + 5.0 - runTime) / ratedBurnTime);
+			failure_du += failureData[type] * Math.Pow(fdScale, 2.0);
 			failureTypes ft = (failureTypes)type;
 			updateCore(); /* Make sure we save our failureData, just in case we explode the part */
 			Logging.LogFormat("Failing engine {0}: {1}", configuration, ft.ToString());
