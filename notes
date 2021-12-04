@@ -38,3 +38,8 @@ Optionally, can add Extra Telemetry to engines; doubles cost, doubles dataRate.
 Fraternal damage: if an engine explodes, all other engines running at the time get a reroll: compute a new failure time (with t = 0 at the point of the explosion), take whichever failure-time is sooner.
 
 There may be an issue with solids not respecting ignition failures (because engine.Shutdown() is ignored).  Not sure how to fix this.
+
+To make Kirk happy, we could have an option to extend the kappa curve for longer before the Old Age section starts.
+
+ratedBurnTime vs. ratedContinuousBurnTime: we roll afresh on each ignition, with B* = min(rCBT, rBT - accumulated_burn_time), and t* = time_since_ignition.  So if your engine has rBT = 150, rCBT = 100, and you make a 100-second burn, when you restart for the next burn your 'flat region' is 50 seconds long, and the guaranteed failure time (end of 'Old age' region) is 5 + B* + rCBT.  Data accumulation follows the standard rules within each burn (earn du up to the end of the flat region; failure du in the old-age region is scaled according to how far through it you are).
+This also means that restarting an engine clears the effect of any fraternal damage.

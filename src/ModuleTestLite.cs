@@ -20,11 +20,15 @@ namespace TestLite
 		public double roll_du = -1;
 		[KSPField(guiFormat = "F1", guiUnits = "du", guiName = "Data (incl. transfer)")]
 		public double roll_du_vab = -1;
+		[KSPField(isPersistant = true)]
+		public double start_du = 0; // du at latest ignition
 
 		[KSPField(isPersistant = true)]
 		public double clampTime = 0;
 		[KSPField(isPersistant = true)]
 		public double runTime = 0;
+		[KSPField(isPersistant = true)]
+		public double startTime = 0; // runTime at latest ignition
 
 		[KSPField(isPersistant = true)]
 		public bool telemetry = false;
@@ -86,8 +90,10 @@ namespace TestLite
 
 		public bool transient_failure = false, minor_failure = false, major_failure = false;
 
-		[KSPField(guiUnits = "s", guiName = "Rated burntime")]
+		[KSPField(guiUnits = "s", guiName = "Rated total burntime")]
 		public double ratedBurnTime;
+		[KSPField(guiUnits = "s", guiName = "Rated continuous burntime")]
+		public double ratedContinuousBurnTime;
 		[KSPField()]
 		public double dataRate = 1.0;
 
@@ -144,12 +150,16 @@ namespace TestLite
 			}
 		}
 
+		public double add_du {
+			get {
+				double goodTime = Math.Min(currentRunTime, remainingBurnTime + 5.0);
+				return Math.Max(goodTime - clampTime, 0.0) * dataRate;
+			}
+		}
 		public double local_du {
 			get {
 				float dataMultiplier = telemetry ? 2f : 1f;
-				double goodTime = Math.Min(runTime, ratedBurnTime + 5.0);
-				double add_du = Math.Max(goodTime - clampTime, 0.0) * dataRate + failure_du;
-				out_du = Math.Min(in_du + add_du * dataMultiplier, maxData);
+				out_du = Math.Min(in_du + (add_du + start_du + failure_du) * dataMultiplier, maxData);
 				return out_du;
 			}
 		}
@@ -165,6 +175,17 @@ namespace TestLite
 				enumerator.Dispose();
 				transferred = Math.Min(transferred, techTransferMax);
 				return Math.Min(in_du_any + transferred, maxData);
+			}
+		}
+
+		public double remainingBurnTime {
+			get {
+				return Math.Max(Math.Min(ratedContinuousBurnTime, ratedBurnTime - startTime), 0d);
+			}
+		}
+		public double currentRunTime {
+			get {
+				return runTime - startTime;
 			}
 		}
 
@@ -203,15 +224,17 @@ namespace TestLite
 			}
 			zoner -= infantP;
 			zoner /= (1d - infantP);
+			if (remainingBurnTime < ratedContinuousBurnTime)
+				flatP *= Math.Exp(remainingBurnTime / ratedContinuousBurnTime);
 			if (zoner < flatP) {
 				// T = 5 - ln(U)/κ
 				// κ = -ln(1 - flatP) / B
-				double kappa = -Math.Log(1d - flatP) / ratedBurnTime;
+				double kappa = -Math.Log(1d - flatP) / ratedContinuousBurnTime;
 				return 5 - Math.Log(1d - zoner) / kappa;
 			}
 			zoner -= flatP;
 			zoner /= (1d - flatP);
-			return 5 + ratedBurnTime * (1d + zoner);
+			return 5 + remainingBurnTime + ratedContinuousBurnTime * zoner;
 		}
 
 		private double rollPorch(double infantP, double flatP)
@@ -227,7 +250,7 @@ namespace TestLite
 			zoner /= (1d - infantP);
 			// T = 5 - ln(U)/κ
 			// κ = -ln(1 - flatP) / B
-			double kappa = -Math.Log(1d - flatP) / ratedBurnTime;
+			double kappa = -Math.Log(1d - flatP) / ratedContinuousBurnTime;
 			return 5 - Math.Log(1d - zoner) / kappa;
 		}
 
@@ -243,14 +266,12 @@ namespace TestLite
 
 		public void Roll()
 		{
-			if (failureTime[0] >= 0d)
-				return;
 			if (engine != null)
-				Logging.LogFormat("Rolling at {0} => {1:R}", roll_du, failureRate);
+				Logging.LogFormat("Rolling at {0} => {1:R}, rbt {2}", roll_du, failureRate, remainingBurnTime);
 			if (determinismMode) {
 				for (int i = 0; i < (int)failureTypes.IGNITION; i++)
 					failureTime[i] = Double.MaxValue;
-				failureTime[(int)failureTypes.PERMANENT] = ratedBurnTime + 5d;
+				failureTime[(int)failureTypes.PERMANENT] = remainingBurnTime + 5d;
 				return;
 			}
 			for (int i = 0; i < (int)failureTypes.IGNITION; i++) {
@@ -264,7 +285,7 @@ namespace TestLite
 		{
 			if (engine == null) return;
 			for (int i = 0; i < (int)failureTypes.IGNITION; i++) {
-				double time = rollOne(i) + runTime;
+				double time = rollOne(i) + currentRunTime;
 				if (time < failureTime[i]) {
 					failureTime[i] = time;
 					Logging.LogFormat("Re-rolled {0} at {1} (fraternal damage)", ((failureTypes)i).ToString(), failureTime[i]);
@@ -286,11 +307,11 @@ namespace TestLite
 
 		private double fStar(double infantP, double flatP, bool bathtub)
 		{
-			if (runTime > 0d && runTime < 5d)
+			if (currentRunTime > 0d && currentRunTime < 5d)
 				return -Math.Log(1d - infantP) / 5d; // lambda
-			if (!bathtub || runTime - 5d < ratedBurnTime)
-				return -Math.Log(1d - flatP) / ratedBurnTime; // kappa
-			return 1d / Math.Max(2d * ratedBurnTime + 5d - runTime, 1d);
+			if (!bathtub || currentRunTime - 5d < remainingBurnTime)
+				return -Math.Log(1d - flatP) / ratedContinuousBurnTime; // kappa
+			return 1d / Math.Max(ratedContinuousBurnTime + remainingBurnTime + 5d - currentRunTime, 1d);
 		}
 
 		public void Update()
@@ -344,11 +365,12 @@ namespace TestLite
 					type = (int)failureTypes.PERFLOSS;
 				}
 			}
-			double fdScale = Math.Min(1.0, (ratedBurnTime * 2.0 + 5.0 - runTime) / ratedBurnTime);
-			failure_du += failureData[type] * Math.Pow(fdScale, 2.0);
+			double fdScale = Math.Min(1.0, (remainingBurnTime + ratedContinuousBurnTime + 5.0 - currentRunTime) / ratedContinuousBurnTime);
+			double award_du = failureData[type] * Math.Pow(fdScale, 2.0);
+			failure_du += award_du;
 			failureTypes ft = (failureTypes)type;
 			updateCore(); /* Make sure we save our failureData, just in case we explode the part */
-			Logging.LogFormat("Failing engine {0}: {1}", configuration, ft.ToString());
+			Logging.LogFormat("Failing engine {0}: {1}; awarding {2} du", configuration, ft.ToString(), award_du);
 			ScreenMessages.PostScreenMessage(String.Format("[TestLite] {0} on {1}", failureDescription[type], configuration), 5f);
 			FlightLogger.eventLog.Add(String.Format("[{0}] {1} on {2}", KSPUtil.PrintTimeCompact((int)Math.Floor(this.vessel.missionTime), false), failureDescription[type], configuration));
 			switch (severityType[type]) {
@@ -396,19 +418,25 @@ namespace TestLite
 			updateFailureRate();
 			updateMTBF();
 			if (engine != null && engine.finalThrust > 0f) {
-				double oldRunTime = runTime;
+				if (!running) {
+					start_du += add_du;
+					startTime = runTime;
+					clampTime = 0;
+					if (!determinismMode) {
+						double r = Core.Instance.rand.NextDouble();
+						Logging.LogFormat("Igniting, r={0} ignitionRate={1}", r, ignitionRate);
+						if (r < ignitionRate && (preLaunchFailures || vessel.situation != Vessel.Situations.PRELAUNCH))
+							triggerFailure((int)failureTypes.IGNITION);
+						Roll();
+					}
+				}
+				double oldRunTime = currentRunTime;
 				runTime += TimeWarp.fixedDeltaTime;
 				if (vessel.situation == Vessel.Situations.PRELAUNCH)
-					clampTime = runTime;
+					clampTime = currentRunTime;
 				for (int i = 0; i < (int)failureTypes.IGNITION; i++)
-					if (oldRunTime < failureTime[i] && failureTime[i] <= runTime)
+					if (oldRunTime < failureTime[i] && failureTime[i] <= currentRunTime)
 						triggerFailure(i);
-				if (!running && !determinismMode) {
-					double r = Core.Instance.rand.NextDouble();
-					Logging.LogFormat("Igniting, r={0} ignitionRate={1}", r, ignitionRate);
-					if (r < ignitionRate && (preLaunchFailures || vessel.situation != Vessel.Situations.PRELAUNCH))
-						triggerFailure((int)failureTypes.IGNITION);
-				}
 				running = true;
 				updateCore();
 			} else {
@@ -475,9 +503,9 @@ namespace TestLite
 		{
 			/* In case we were KCT-recovered, clear any Flight state on Editor initialisation. */
 			major_failure = minor_failure = transient_failure = false;
-			runTime = clampTime = 0;
+			runTime = clampTime = startTime = 0;
 			in_du = roll_du = -1;
-			failure_du = 0;
+			failure_du = start_du = 0;
 			for (int i = 0; i < (int)failureTypes.IGNITION; i++)
 				failureTime[i] = -1;
 			running = false;
@@ -507,8 +535,6 @@ namespace TestLite
 				}
 			}
 			updateFailureRate();
-			if (!editor)
-				Roll();
 			updateMTBF();
 			bool hadEngine = getEngine();
 			updateFieldsGui(hadEngine, engine != null);
@@ -522,6 +548,7 @@ namespace TestLite
 			if (had == have)
 				return;
 			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
+			Fields["ratedContinuousBurnTime"].guiActive = Fields["ratedContinuousBurnTime"].guiActiveEditor = have && (ratedContinuousBurnTime < ratedBurnTime);
 			Fields["roll_du"].guiActive = Fields["roll_du_vab"].guiActiveEditor = have && !determinismMode;
 			Fields["out_du"].guiActive = have && !determinismMode;
 			Fields["ignitionRate"].guiActive = Fields["ignitionRate"].guiActiveEditor = have && !determinismMode;
