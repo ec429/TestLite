@@ -37,9 +37,21 @@ Optionally, can add Extra Telemetry to engines; doubles cost, doubles dataRate.
 
 Fraternal damage: if an engine explodes, all other engines running at the time get a reroll: compute a new failure time (with t = 0 at the point of the explosion), take whichever failure-time is sooner.
 
-There may be an issue with solids not respecting ignition failures (because engine.Shutdown() is ignored).  Not sure how to fix this.
+There may be an issue with solids not respecting ignition failures (because engine.Shutdown() is ignored).  Not sure how to fix this (maybe just explode them like with shutdown failures?).
 
 To make Kirk happy, we could have an option to extend the kappa curve for longer before the Old Age section starts.
 
 ratedBurnTime vs. ratedContinuousBurnTime: we roll afresh on each ignition, with B* = min(rCBT, rBT - accumulated_burn_time), and t* = time_since_ignition.  So if your engine has rBT = 150, rCBT = 100, and you make a 100-second burn, when you restart for the next burn your 'flat region' is 50 seconds long, and the guaranteed failure time (end of 'Old age' region) is 5 + B* + rCBT.  Data accumulation follows the standard rules within each burn (earn du up to the end of the flat region; failure du in the old-age region is scaled according to how far through it you are).
 This also means that restarting an engine clears the effect of any fraternal damage.
+
+testedBurnTime: call it S.  Use S+5 instead of 2B+5 for the end of the Old Age curve.
+  B + 5 ≤ t < S + 5, f(t) = 1 / (S - B), P (T < t | T ≥ B + 5) = (t - B - 5) / (S - B)
+  Thus P(T < S + 5 | T ≥ B + 5) = (S - B) / (S - B) = 1 (ok)
+  f*(t) = 1 / (S + 5 - t)
+  so f*(B + 5) = 1 / (S - B)
+  and f*(S + 5) is infinite
+This is pessimistic because it implies that the chance of failing before reaching the in-fact-tested time is 100%.  Maybe we make the tested be the median, so double (S - B)?
+
+restart & rCBT: immediately after shutdown we want effective rCBT to be what we had left in the last burn, then tick upwards.  B* = min(rCBT, rCBT - last_burn_duration + time_since_shutdown * cooldownFactor, rBT - accumulated_burn_time).  So if in our previous example you restart after 20 seconds (and assuming cooldownFactor is its default 1), B* = 20, whereas if you waited three minutes B* would be 50 as above.  If you try to start an engine with B* < 5 it automatically ignition-fails.  We could *also* incorporate restartWindowPenalty just as a modifier to ignitionReliability, but I'm not in a hurry to do that — only a few engines use it and ShowInfo is hard (I'd probably just cop out and make it say "this engine *has* a restart window penalty").
+
+thrustModifier: scale the addend in `runTime += TimeWarp.fixedDeltaTime;`.  Also inversely scale MTBF for display.

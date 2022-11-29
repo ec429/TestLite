@@ -8,24 +8,26 @@ namespace TestLite
 {
 	public class ModuleTestLite : PartModule, IPartCostModifier
 	{
+		public const string groupName = "ModuleTestLite";
+		public const string groupDisplayName = "TestLite";
 		[KSPField(isPersistant = true)]
 		public double in_du = -1;
 		[KSPField()]
 		public double in_du_vab = -1;
 		[KSPField(isPersistant = true)]
 		public double failure_du = 0;
-		[KSPField(isPersistant = false, guiFormat = "F1", guiUnits = "du", guiName = "Collected data")]
+		[KSPField(isPersistant = false, guiFormat = "F1", guiUnits = "du", guiName = "Collected data", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public double out_du = 0;
-		[KSPField(isPersistant = true, guiFormat = "F1", guiUnits = "du", guiName = "Data at launch")]
+		[KSPField(isPersistant = true, guiFormat = "F1", guiUnits = "du", guiName = "Data at launch", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public double roll_du = -1;
-		[KSPField(guiFormat = "F1", guiUnits = "du", guiName = "Data (incl. transfer)")]
+		[KSPField(guiFormat = "F1", guiUnits = "du", guiName = "Data (incl. transfer)", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public double roll_du_vab = -1;
 		[KSPField(isPersistant = true)]
 		public double start_du = 0; // du at latest ignition
 
 		[KSPField(isPersistant = true)]
 		public double clampTime = 0;
-		[KSPField(isPersistant = true)]
+		[KSPField(isPersistant = true, guiFormat = "F1", guiUnits = "s", guiName = "Accumulated burn time", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public double runTime = 0;
 		[KSPField(isPersistant = true)]
 		public double startTime = 0; // runTime at latest ignition
@@ -37,7 +39,7 @@ namespace TestLite
 			telemetry = v;
 			Events["EventTelemetry"].guiName = telemetry ? "Disable Extra Telemetry" : "Enable Extra Telemetry";
 		}
-		[KSPEvent(guiName = "Enable Extra Telemetry")]
+		[KSPEvent(guiName = "Enable Extra Telemetry", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public void EventTelemetry()
 		{
 			setTelemetry(!telemetry);
@@ -51,7 +53,7 @@ namespace TestLite
 			Events["EventPreflight"].guiName = preflight ? "Disable Extra Preflight" : "Enable Extra Preflight";
 			updateFailureRate();
 		}
-		[KSPEvent(guiName = "Enable Extra Preflight")]
+		[KSPEvent(guiName = "Enable Extra Preflight", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public void EventPreflight()
 		{
 			bool nv = !preflight;
@@ -61,17 +63,18 @@ namespace TestLite
 
 		private bool initialised = false;
 
-		[KSPField(guiFormat = "P2", guiName = "Full-burn failure rate")]
+		[KSPField(guiFormat = "P2", guiName = "Full-burn failure rate", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public double failureRate = 0;
-		[KSPField(guiFormat = "P2", guiName = "Ignition failure rate")]
+		[KSPField(guiFormat = "P2", guiName = "Ignition failure rate", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public double ignitionRate = 0; // P(ignition failure)
 
 		[KSPField()]
 		public double fstar = 0; /* 1/MTBF */
-		[KSPField()]
+		[KSPField(guiName = "MTBF", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public string MTBF; /* 1/MTBF */
 		[KSPField()]
 		public bool running = false;
+		private float currentThrottle = 1.0f;
 
 		public enum failureTypes {
 			TRANSIENT,
@@ -90,10 +93,14 @@ namespace TestLite
 
 		public bool transient_failure = false, minor_failure = false, major_failure = false;
 
-		[KSPField(guiUnits = "s", guiName = "Rated total burntime")]
+		[KSPField(guiUnits = "s", guiName = "Rated total burntime", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public double ratedBurnTime;
-		[KSPField(guiUnits = "s", guiName = "Rated continuous burntime")]
+		[KSPField(guiUnits = "s", guiName = "Rated continuous burntime", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public double ratedContinuousBurnTime;
+		[KSPField(guiUnits = "s", guiName = "Tested overburn time", groupName = groupName, groupDisplayName = groupDisplayName)]
+		public double overBurnTime;
+		[KSPField()]
+		public FloatCurve thrustModifier;
 		[KSPField()]
 		public double dataRate = 1.0;
 
@@ -183,6 +190,8 @@ namespace TestLite
 				return Math.Max(Math.Min(ratedContinuousBurnTime, ratedBurnTime - startTime), 0d);
 			}
 		}
+		[KSPField(guiFormat = "F1", guiUnits = "s", guiName = "Current burn time", groupName = groupName, groupDisplayName = groupDisplayName)]
+		public double _currentRunTime = 0;
 		public double currentRunTime {
 			get {
 				return runTime - startTime;
@@ -234,7 +243,8 @@ namespace TestLite
 			}
 			zoner -= flatP;
 			zoner /= (1d - flatP);
-			return 5 + remainingBurnTime + ratedContinuousBurnTime * zoner;
+			// tested overburn is median, double it
+			return 5 + remainingBurnTime + overBurnTime * 2.0 * zoner;
 		}
 
 		private double rollPorch(double infantP, double flatP)
@@ -311,7 +321,7 @@ namespace TestLite
 				return -Math.Log(1d - infantP) / 5d; // lambda
 			if (!bathtub || currentRunTime - 5d < remainingBurnTime)
 				return -Math.Log(1d - flatP) / ratedContinuousBurnTime; // kappa
-			return 1d / Math.Max(ratedContinuousBurnTime + remainingBurnTime + 5d - currentRunTime, 1d);
+			return 1d / Math.Max(overBurnTime * 2.0 + remainingBurnTime + 5d - currentRunTime, 1d);
 		}
 
 		public void Update()
@@ -320,6 +330,7 @@ namespace TestLite
 			updateFieldsGui(hadEngine, engine != null);
 			if (!initialised && Core.Instance != null)
 				Initialise();
+			_currentRunTime = currentRunTime;
 		}
 
 		private void updateCore()
@@ -338,7 +349,7 @@ namespace TestLite
 				fstar += fStar(infantPFactor[i] * failureRate,
 					       flatPFactor[i] * failureRate,
 					       bathtubType[i]);
-			double mtbf = 0.5d / Math.Max(fstar, 1e-12);
+			double mtbf = 0.5d / Math.Max(fstar * thrustModifier.Evaluate(currentThrottle), 1e-12);
 			if (mtbf < 1200)
 				MTBF = String.Format("{0:0.#}s", mtbf);
 			else
@@ -365,7 +376,7 @@ namespace TestLite
 					type = (int)failureTypes.PERFLOSS;
 				}
 			}
-			double fdScale = Math.Min(1.0, (remainingBurnTime + ratedContinuousBurnTime + 5.0 - currentRunTime) / ratedContinuousBurnTime);
+			double fdScale = Math.Min(1.0, (remainingBurnTime + overBurnTime + 5.0 - currentRunTime) / overBurnTime);
 			double award_du = failureData[type] * Math.Pow(fdScale, 2.0);
 			failure_du += award_du;
 			failureTypes ft = (failureTypes)type;
@@ -387,7 +398,11 @@ namespace TestLite
 			switch (ft) {
 			case failureTypes.TRANSIENT:
 			case failureTypes.IGNITION:
+				// temporarily override allowShutdown so that e.g. a solid can ignition-fail
+				bool allow = engine.allowShutdown;
+				engine.allowShutdown = true;
 				engine.Shutdown();
+				engine.allowShutdown = allow;
 				break;
 			case failureTypes.PERMANENT:
 				engine.Shutdown();
@@ -416,7 +431,6 @@ namespace TestLite
 			if (!HighLogic.LoadedSceneIsFlight && roll_du_vab < 0d)
 				roll_du_vab = total_du;
 			updateFailureRate();
-			updateMTBF();
 			if (engine != null && engine.finalThrust > 0f) {
 				if (!running) {
 					start_du += add_du;
@@ -431,7 +445,10 @@ namespace TestLite
 					}
 				}
 				double oldRunTime = currentRunTime;
-				runTime += TimeWarp.fixedDeltaTime;
+				// calculation copied from TF, to ensure we match its semantics for the config curve
+				// except that atmCurveIsp seems to evaluate to 0, use atmosphereCurve instead since that's what everyone in RealFuels-land seems to use
+				currentThrottle = engine.finalThrust / engine.maxThrust * engine.atmosphereCurve.Evaluate(0f) / engine.realIsp / engine.multIsp / engine.flowMultiplier;
+				runTime += TimeWarp.fixedDeltaTime * thrustModifier.Evaluate(currentThrottle);
 				if (vessel.situation == Vessel.Situations.PRELAUNCH)
 					clampTime = currentRunTime;
 				for (int i = 0; i < (int)failureTypes.IGNITION; i++)
@@ -440,8 +457,11 @@ namespace TestLite
 				running = true;
 				updateCore();
 			} else {
+				// Just display MTBFs for full throttle
+				currentThrottle = 1.0f;
 				running = false;
 			}
+			updateMTBF();
 		}
 
 		public bool getEngine()
@@ -549,6 +569,9 @@ namespace TestLite
 				return;
 			Fields["ratedBurnTime"].guiActive = Fields["ratedBurnTime"].guiActiveEditor = have;
 			Fields["ratedContinuousBurnTime"].guiActive = Fields["ratedContinuousBurnTime"].guiActiveEditor = have && (ratedContinuousBurnTime < ratedBurnTime);
+			Fields["overBurnTime"].guiActive = Fields["overBurnTime"].guiActiveEditor = have;
+			Fields["runTime"].guiActive = have;
+			Fields["_currentRunTime"].guiActive = have && (ratedContinuousBurnTime < ratedBurnTime);
 			Fields["roll_du"].guiActive = Fields["roll_du_vab"].guiActiveEditor = have && !determinismMode;
 			Fields["out_du"].guiActive = have && !determinismMode;
 			Fields["ignitionRate"].guiActive = Fields["ignitionRate"].guiActiveEditor = have && !determinismMode;
@@ -629,6 +652,10 @@ namespace TestLite
 			if (node.HasNode("ignitionCurve")) {
 				ignitionCurve = new FloatCurve();
 				ignitionCurve.Load(node.GetNode("ignitionCurve"));
+			}
+			if (node.HasNode("thrustModifier")) {
+				thrustModifier = new FloatCurve();
+				thrustModifier.Load(node.GetNode("thrustModifier"));
 			}
 			OnAwake();
 		}
