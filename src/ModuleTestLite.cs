@@ -376,7 +376,7 @@ namespace TestLite
 					type = (int)failureTypes.PERFLOSS;
 				}
 			}
-			double fdScale = Math.Min(1.0, (remainingBurnTime + overBurnTime + 5.0 - currentRunTime) / overBurnTime);
+			double fdScale = Math.Max(0.0, Math.Min(1.0, (remainingBurnTime + overBurnTime + 5.0 - currentRunTime) / overBurnTime));
 			double award_du = failureData[type] * Math.Pow(fdScale, 2.0);
 			failure_du += award_du;
 			failureTypes ft = (failureTypes)type;
