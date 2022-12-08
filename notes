@@ -51,6 +51,7 @@ testedBurnTime: call it S.  Use S+5 instead of 2B+5 for the end of the Old Age c
   so f*(B + 5) = 1 / (S - B)
   and f*(S + 5) is infinite
 This is pessimistic because it implies that the chance of failing before reaching the in-fact-tested time is 100%.  Maybe we make the tested be the median, so double (S - B)?
+Some engines have very long testedBurnTime, need to check that MTBF doesn't go *up* after ratedBurnTime because that would be silly.  Also I'm still not quite sure whether tBT is meant to be for BT or CBT :S
 
 restart & rCBT: immediately after shutdown we want effective rCBT to be what we had left in the last burn, then tick upwards.  B* = min(rCBT, rCBT - last_burn_duration + time_since_shutdown * cooldownFactor, rBT - accumulated_burn_time).  So if in our previous example you restart after 20 seconds (and assuming cooldownFactor is its default 1), B* = 20, whereas if you waited three minutes B* would be 50 as above.  If you try to start an engine with B* < 5 it automatically ignition-fails.  We could *also* incorporate restartWindowPenalty just as a modifier to ignitionReliability, but I'm not in a hurry to do that — only a few engines use it and ShowInfo is hard (I'd probably just cop out and make it say "this engine *has* a restart window penalty").
 
