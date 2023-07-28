@@ -67,6 +67,8 @@ namespace TestLite
 		public double failureRate = 0;
 		[KSPField(guiFormat = "P2", guiName = "Ignition failure rate", groupName = groupName, groupDisplayName = groupDisplayName)]
 		public double ignitionRate = 0; // P(ignition failure)
+		[KSPField(guiFormat = "P2", guiName = "Q penalty", groupName = groupName, groupDisplayName = groupDisplayName)]
+		public double qPenaltyGui = 0;
 
 		[KSPField()]
 		public double fstar = 0; /* 1/MTBF */
@@ -115,6 +117,8 @@ namespace TestLite
 		public FloatCurve reliabilityCurve;
 		[KSPField()]
 		public FloatCurve ignitionCurve;
+		[KSPField()]
+		public double ignitionDynPresFailMultiplier = 0.0;
 		[KSPField()]
 		public string techTransfer;
 		private Dictionary<string, double> techTransferData;
@@ -219,7 +223,13 @@ namespace TestLite
 		{
 			float pfMult = preflight ? 0.75f : 1f;
 			failureRate = reliabilityCurve.Evaluate((float)roll_du_any) * ratedBurnTime * pfMult;
-			ignitionRate = (1d - ignitionCurve.Evaluate((float)roll_du_any)) * pfMult;
+			double qScaled = 0d;
+			if (ignitionDynPresFailMultiplier > 0d)
+				qScaled = part.dynamicPressurekPa * 1000d / ignitionDynPresFailMultiplier;
+			/* 1.0f for no penalty, 0.0f always fails */
+			float qPenalty = Mathf.Clamp(Core.Instance.qPenaltyCurve.Evaluate((float)qScaled), 0, 1);
+			qPenaltyGui = 1.0f - qPenalty;
+			ignitionRate = (1d - ignitionCurve.Evaluate((float)roll_du_any) * qPenalty) * pfMult;
 		}
 
 		private double rollBathtub(double infantP, double flatP)
@@ -575,6 +585,7 @@ namespace TestLite
 			Fields["roll_du"].guiActive = Fields["roll_du_vab"].guiActiveEditor = have && !determinismMode;
 			Fields["out_du"].guiActive = have && !determinismMode;
 			Fields["ignitionRate"].guiActive = Fields["ignitionRate"].guiActiveEditor = have && !determinismMode;
+			Fields["qPenaltyGui"].guiActive = have && !determinismMode;
 			Fields["MTBF"].guiActive = Fields["MTBF"].guiActiveEditor = have && !determinismMode;
 			Fields["failureRate"].guiActiveEditor = have && !determinismMode;
 			Events["EventTelemetry"].guiActiveEditor = have && !determinismMode;
