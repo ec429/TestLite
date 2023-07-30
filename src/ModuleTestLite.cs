@@ -118,6 +118,10 @@ namespace TestLite
 		[KSPField()]
 		public FloatCurve ignitionCurve;
 		[KSPField()]
+		public FloatCurve customQPenaltyCurve;
+		[KSPField()]
+		public bool haveCustomQCurve = false;
+		[KSPField()]
 		public double ignitionDynPresFailMultiplier = 0.0;
 		[KSPField()]
 		public string techTransfer;
@@ -219,15 +223,27 @@ namespace TestLite
 			}
 		}
 
+		private FloatCurve qPenaltyCurve {
+			get {
+				if (haveCustomQCurve)
+					return customQPenaltyCurve;
+				if (Core.Instance != null)
+					return Core.Instance.qPenaltyCurve;
+				return null;
+			}
+		}
+
 		private void updateFailureRate()
 		{
 			float pfMult = preflight ? 0.75f : 1f;
 			failureRate = reliabilityCurve.Evaluate((float)roll_du_any) * ratedBurnTime * pfMult;
 			double qScaled = 0d;
-			if (ignitionDynPresFailMultiplier > 0d)
-				qScaled = part.dynamicPressurekPa * 1000d / ignitionDynPresFailMultiplier;
+			if (ignitionDynPresFailMultiplier > 0d && vessel != null)
+				qScaled = vessel.dynamicPressurekPa * 1000d / ignitionDynPresFailMultiplier;
 			/* 1.0f for no penalty, 0.0f always fails */
-			float qPenalty = Mathf.Clamp(Core.Instance.qPenaltyCurve.Evaluate((float)qScaled), 0, 1);
+			float qPenalty = 1.0f;
+			if (qPenaltyCurve != null)
+				qPenalty = Mathf.Clamp(qPenaltyCurve.Evaluate((float)qScaled), 0.0f, 1.0f);
 			qPenaltyGui = 1.0f - qPenalty;
 			ignitionRate = (1d - ignitionCurve.Evaluate((float)roll_du_any) * qPenalty) * pfMult;
 		}
@@ -448,7 +464,7 @@ namespace TestLite
 					clampTime = 0;
 					if (!determinismMode) {
 						double r = Core.Instance.rand.NextDouble();
-						Logging.LogFormat("Igniting, r={0} ignitionRate={1}", r, ignitionRate);
+						Logging.LogFormat("Igniting, r={0:F4} ignitionRate={1:F4} (with qPenalty={2:F4})", r, ignitionRate, 1.0f - qPenaltyGui);
 						if (r < ignitionRate && (preLaunchFailures || vessel.situation != Vessel.Situations.PRELAUNCH))
 							triggerFailure((int)failureTypes.IGNITION);
 						Roll();
@@ -667,6 +683,14 @@ namespace TestLite
 			if (node.HasNode("thrustModifier")) {
 				thrustModifier = new FloatCurve();
 				thrustModifier.Load(node.GetNode("thrustModifier"));
+			}
+			/* Usually we just refer to the default
+			 * pressureCurve, but allow cfgs to override it
+			 */
+			if (node.HasNode("pressureCurve")) {
+				customQPenaltyCurve = new FloatCurve();
+				customQPenaltyCurve.Load(node.GetNode("pressureCurve"));
+				haveCustomQCurve = true;
 			}
 			OnAwake();
 		}

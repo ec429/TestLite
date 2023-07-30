@@ -13,7 +13,10 @@ namespace TestLite
 		public static Core Instance { get; protected set; }
 		public System.Random rand;
 		public Dictionary<string, double> du;
-		public FloatCurve qPenaltyCurve;
+		/* standard values RO uses for all engines; this saves memory
+		 * vs. putting a copy in every single ModuleTestLite instance
+		 */
+		public FloatCurve qPenaltyCurve = null;
 
 		public void Start()
 		{
@@ -25,16 +28,23 @@ namespace TestLite
 			Instance = this;
 			du = new Dictionary<string, double>();
 			rand = new System.Random();
-			/* hardcode the values RO uses for all engines;
-			 * this saves memory vs. putting a copy in every
-			 * single ModuleTestLite instance
-			 */
-			qPenaltyCurve = new FloatCurve();
-			qPenaltyCurve.Add(0f, 1f, 0f, 0f);
-			qPenaltyCurve.Add(5000f, 1f, 0f, 0f);
-			qPenaltyCurve.Add(15000f, 0.85f, -2.25e-5f, -2.25e-5f);
-			qPenaltyCurve.Add(30000f, 0.4f);
-			qPenaltyCurve.Add(50000f, 0.15f, 0f, 0f);
+			foreach (ConfigNode node in GameDatabase.Instance.GetConfigNodes("TESTLITE")) {
+				ConfigNode pressureNode = node.GetNode("pressureCurve");
+				if (pressureNode != null) {
+					qPenaltyCurve = new FloatCurve();
+					qPenaltyCurve.Load(pressureNode);
+				}
+			}
+			if (qPenaltyCurve == null) {
+				Logging.Log("No pressureCurve specified in cfg, using default");
+				/* Hardcode defaults if cfg is missing */
+				qPenaltyCurve = new FloatCurve();
+				qPenaltyCurve.Add(0f, 1f, 0f, 0f);
+				qPenaltyCurve.Add(5000f, 1f, 0f, 0f);
+				qPenaltyCurve.Add(15000f, 0.85f, -2.25e-5f, -2.25e-5f);
+				qPenaltyCurve.Add(30000f, 0.4f);
+				qPenaltyCurve.Add(50000f, 0.15f, 0f, 0f);
+			}
 			if (ScenarioTestLite.Instance != null)
 				Load(ScenarioTestLite.Instance.node);
 			Logging.Log("Core loaded successfully");
